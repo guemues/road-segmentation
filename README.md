@@ -1,6 +1,6 @@
 # Starting
-- [ ] Understand the data, how to make submission
-- [ ] Push data to git
+- [x] Understand the data, how to make submission
+- [x] Push data to git
 - [ ] Methods for loading data. Read as tensor or as a filename keyed dictionary
 # BOW
 - [ ] how to extract sift? Which library to use? Need to look at skimage. patch size is a hyperparameter
