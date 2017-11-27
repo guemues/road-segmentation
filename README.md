@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/guemues/road-segmentation.svg?branch=master)](https://travis-ci.org/guemues/road-segmentation)
+
 # Starting
 - [x] Understand the data, how to make submission
 - [x] Push data to git
