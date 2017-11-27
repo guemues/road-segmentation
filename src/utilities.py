@@ -1,5 +1,5 @@
 # This is  a tutorial file
-from numpy import ndarray
+from numpy import ndarray, empty
 from error import CenterException, SizeException
 
 
@@ -10,6 +10,7 @@ def test():
 
 def crop_image(image, corner, size, size_exception=True, center_exception=True):
     """ Crop the numpy matrix
+    :param size_exception: If it is True function may return
     :type image: ndarray
     :type corner: tuple
     :type size: tuple
@@ -21,8 +22,11 @@ def crop_image(image, corner, size, size_exception=True, center_exception=True):
 
     start_x, start_y = corner
 
-    if center_exception and (start_x >= max_x or start_y >= max_y):
-        raise CenterException()
+    if start_x >= max_x or start_y >= max_y:
+        if center_exception:
+            raise CenterException()
+        else:
+            return empty(shape=(0, 0))
 
     w, h = size
 
