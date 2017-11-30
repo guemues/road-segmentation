@@ -4,7 +4,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 from sklearn.svm import LinearSVC, SVC
 
-import cv2
+import cv2, os
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
@@ -104,13 +104,16 @@ class Trainer(object):
             keypoints, descriptors = I
 
             for i, kp in enumerate(keypoints):
-                if truth(kp.pt[1], kp.pt[0]) == 1:
-                    data_road = data_road + (descriptors[i],)
+                if truth[np.int(kp.pt[1]), np.int(kp.pt[0])] == 1:
+                    data_road = data_road + (descriptors[i].reshape(1,-1),)
                 else:
-                    data_background = data_background + (descriptors[i],)
+                    data_background = data_background + (descriptors[i].reshape(1,-1),)
 
-            data_set_road = data_set_road + (self.bow_model.transform(np.concatenate(data_road, axis=0)),)
-            data_set_background = data_set_background + (self.bow_model.transform(np.concatenate(data_background, axis=0)),)
+            tmp_road = np.concatenate(data_road, axis=0)
+            tmp_back = np.concatenate(data_background, axis=0)
+
+            data_set_road = data_set_road + (self.bow_model.transform(tmp_road).reshape(1,-1),)
+            data_set_background = data_set_background + (self.bow_model.transform(tmp_back).reshape(1,-1),)
 
         self.training_set_road = np.concatenate(data_set_road, axis=0)
         self.training_set_background = np.concatenate(data_set_background, axis=0)

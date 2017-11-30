@@ -72,7 +72,7 @@ class Tester(object):
         else:
             self.model.generate_patch_training_set(self.WINDOW_SIZE, self.CONFIDENCE, self.STEP_SIZE)
 
-        if self.classifier == 'SVM'
+        if self.classifier == 'SVM':
             self.model.fit_svm(self.data_generation_mode)
         elif self.classifier == 'Logistic_Regression':
             self.model.fit_logistic_regression(self.data_generation_mode)
@@ -104,13 +104,13 @@ class Tester(object):
                 feature = ()
                 for i, kp in enumerate(keypoints):
                     if is_within_window(kp.pt, (x, y), self.WINDOW_SIZE):
-                        feature = feature + (descriptors[i, :],)
+                        feature = feature + (descriptors[i, :].reshape(1,-1),)
 
-                image_features = self.bow_model.transform(np.concatenate(feature, axis=0))
+                image_features = self.model.bow_model.transform(np.concatenate(feature, axis=0))
                 prob = self.model.svm_model.predict_proba(image_features)
-                prob_window = prob * np.ones((self.WINDOW_SIZE, self.WINDOW_SIZE))
-                prediction_grid[y:self.WINDOW_SIZE, x:self.WINDOW_SIZE] = \
-                    np.maximum(prediction_grid[y:self.WINDOW_SIZE, x:self.WINDOW_SIZE], prob_window)
+                prob_window = prob[0, 1] * np.ones((self.WINDOW_SIZE, self.WINDOW_SIZE))
+                prediction_grid[y:y+self.WINDOW_SIZE, x:x+self.WINDOW_SIZE] = \
+                    np.maximum(prediction_grid[y:y+self.WINDOW_SIZE, x:x+self.WINDOW_SIZE], prob_window)
 
         return prediction_grid
 

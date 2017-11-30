@@ -21,11 +21,12 @@ def main():
 
     data_dir = '/home/ali/Dropbox/Courses/CS-433/road-segmentation/training_images'
     label_dir = '/home/ali/Dropbox/Courses/CS-433/road-segmentation/training_groundtruth'
-    test_dir = '/home/ali/Dropbox/Courses/CS-433/road-segmentation/test_images'
 
-    tester = Tester()
-    tester.fit(data_dir, label_dir)
-    predictions = tester.transform(test_dir)
+    trainer = Trainer()
+    trainer.fit_sift(data_dir, label_dir, init=True)
+    trainer.fit_bow()
+    trainer.generate_image_training_set()
+    trainer.fit_svm
 
 if __name__ == "__main__":
     main()

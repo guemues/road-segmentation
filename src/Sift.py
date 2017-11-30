@@ -2,7 +2,7 @@
 import sys
 sys.path.append('/home/epfl/ftp/insta-network/src')
 
-import cv2
+import cv2, os
 import numpy as np
 import matplotlib.pyplot as plt
 from os import listdir
@@ -10,7 +10,11 @@ from os.path import join, isfile
 
 
 class DenseSift(object):
+    """ This class implements a denseSIFT algorithm and keeps track of
+
+    """
     def __init__(self, data=None, label=None, init=False):
+        """Constructor for the DenseSift class. All the instanc variables are initialized empty"""
         self.corpus = {}
         self.groundtruth = {}
         self.SIFT_points = {}
@@ -22,7 +26,7 @@ class DenseSift(object):
         # read images in given directories
         if init:
             # apply necessary checks to input arguments
-            assert (is_instance(init, str))
+            assert (isinstance(init, bool))
             assert (os.path.isdir(data))
             assert (os.path.isdir(label))
 
@@ -57,8 +61,8 @@ class DenseSift(object):
                 keypoints.sort(key=lambda p: p.pt)
 
             # compute SIFT descriptors for provided key points and save
-            keypoints, descriptors = sift.compute(I, keypoints)
-            self.SIFT_points[key] = (keypoints, descriptors)
+            keypoints_, descriptors = sift.compute(I, keypoints)
+            self.SIFT_points[key] = (keypoints_, descriptors)
 
     def get_corpus(self):
         return self.corpus

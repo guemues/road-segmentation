@@ -5,7 +5,7 @@ from sklearn.preprocessing import normalize
 
 
 class Bow():
-    def __init__(self, num_centers=1000, norm="l1"):
+    def __init__(self, num_centers=10, norm="l1"):
         self.num_centers = num_centers
         self.norm = norm
         self.features = None
@@ -16,7 +16,7 @@ class Bow():
         self.centers = np.empty((self.num_centers, self.features.shape[1]))
         assert (self.features.shape[0] > self.num_centers)
 
-        self.kmeans = KMeans(n_clusters=self.num_centers, verbose=1).fit(self.features)
+        self.kmeans = KMeans(n_clusters=self.num_centers, verbose=1, n_init=2, max_iter=100).fit(self.features)
         #self.nn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(self.centers)
 
     def transform(self, feature):

@@ -40,7 +40,7 @@ def crop_image(image, corner, size, size_exception=True, center_exception=True):
 
 def is_within_window(pt, corner, size):
 
-    if (pt[0] >= corner[0]) & (pt[0] <= corner[0] + size[0]) & (pt[1] >= corner[1]) & (pt[1] <= corner[1] + size[1]):
+    if (pt[0] >= corner[0]) & (pt[0] <= corner[0] + size) & (pt[1] >= corner[1]) & (pt[1] <= corner[1] + size):
         return True
     else:
         return False
