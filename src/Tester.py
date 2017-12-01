@@ -27,7 +27,7 @@ class Tester(object):
     WINDOW_SIZE = 20 # window size for generating training data in patch mode
     CONFIDENCE = 4 # size of the confidence region in center of patches, required for patch mode training example generation
     STEP_SIZE = 2 # step size of patch generation
-    CLASSIFIER = ['SVM', 'Logistic_Regression'] # classifier type
+    CLASSIFIER = ['SVM', 'Logistic_Regression'] # classifier type specification
 
     def __init__(self, test_dir=None, init=False):
         self.model = Trainer()
