@@ -38,14 +38,17 @@ def crop_image(image, corner, size, size_exception=True, center_exception=True):
 
     return image[start_x:end_x, start_y:end_y]
 
-def is_within_window(pt, corner, size):
 
+def is_within_window(pt, corner, size):
+    # TODO: Documentation
     if (pt[0] >= corner[0]) & (pt[0] <= corner[0] + size) & (pt[1] >= corner[1]) & (pt[1] <= corner[1] + size):
         return True
     else:
         return False
 
+
 def check_patch_confidence(truth, corner, window_size, confidence):
+    # TODO: Documentation
 
     assert (window_size >= confidence)
 

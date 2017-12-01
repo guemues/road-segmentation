@@ -3,6 +3,8 @@ import numpy as np
 from skimage.io import imread
 
 def load_data():
+    # TODO: Documentation
+
     folder_list = ["../training_images/", "../training_groundtruth/", "../test_images/"]
     images_list = []
     for folder in folder_list:
