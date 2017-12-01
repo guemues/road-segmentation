@@ -5,29 +5,53 @@ from sklearn.preprocessing import normalize
 
 
 class Bow():
-    def __init__(self, num_centers=10, norm="l1"):
+    """This class implements a bag of words model for given data sample. IDeally, the feature vectors are 128 dimensional
+    SIFT descriptors. Basically, bag of words model for images works in the following way:
+    - Training data (Nx128 matrix of SIFT descriptors) is clustered into K clusters using K-means with L1 distance.
+    - For each feature matrix of image/patch, histogram vector is calculated based on nearest cluster means for each data
+    sample in the matrix
+    - Histogram is normalized into the 'transformed feature vector' of the given patch/image
+    """
+    def __init__(self, num_centers=1000, norm="l1"):
+        """parameter are initialized to default values
+        """
         self.num_centers = num_centers
         self.norm = norm
         self.features = None
         self.kmeans = None
 
     def fit(self, features):
-        self.features = features
+        """Takes in the training feature matrix and builds the K-Means model with specified number of centers
+
+        :type features: ndarray (N-by-128)
+        """
+        self.features = features # store training data for future trials
         self.centers = np.empty((self.num_centers, self.features.shape[1]))
         assert (self.features.shape[0] > self.num_centers)
 
-        self.kmeans = KMeans(n_clusters=self.num_centers, verbose=1, n_init=2, max_iter=100).fit(self.features)
+        self.kmeans = KMeans(n_clusters=self.num_centers, verbose=1, n_init=10, max_iter=200).fit(self.features)
         #self.nn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(self.centers)
 
     def transform(self, feature):
+        """Given a feature matrix for an image/patch, transform into normalized histogram of cluster centers. Each sample
+        vector is assigned to the closest center
+
+        :type feature: ndarray (N-by-128)
+        :rtype hist: np.array (1-by-num_centers)
+        """
+
+        # shape assertion for avoiding shapes (n,) and (,n)
         assert (feature.ndim == 2)
         if self.kmeans is None:
             raise AssertionError
+
+        # predict the cluster for each data row, and transform into normalized histogram feature vector
         labels = self.kmeans.predict(feature)
         hist, _ = np.histogram(labels.reshape(-1,1), bins=np.arange(0,self.num_centers,1))
         return self.__normalize(hist)
 
     def __normalize(self, feature):
+        """given a histogram, normalizes with respect to some norm (L1 by default)"""
         if self.norm is None:
             return feature
         feature_norm = normalize(feature.astype(np.float64), norm=self.norm)

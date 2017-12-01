@@ -10,11 +10,12 @@ from os.path import join, isfile
 
 
 class DenseSift(object):
-    """ This class implements a denseSIFT algorithm and keeps track of
-
+    """ This class implements a denseSIFT algorithm that samples key points from a given image and computes their SIFT
+    descriptors. True SIFT keypoints and densely sampled key points are merged and their descriptors are computed
+    collectively
     """
     def __init__(self, data=None, label=None, init=False):
-        """Constructor for the DenseSift class. All the instanc variables are initialized empty"""
+        """Constructor for the DenseSift class. All the instance variables are initialized empty"""
         self.corpus = {}
         self.groundtruth = {}
         self.SIFT_points = {}
@@ -22,6 +23,13 @@ class DenseSift(object):
         self.populate_corpus(data, label, init)
 
     def populate_corpus(self, data, label, init):
+        """Given directories that store training data and their groundtruth images, populates them into respective
+        dictionary structures, identified by image file name. If init=False, then the function return immediately
+
+        :type data: str
+        :type label: str
+        :type init: bool
+        """
 
         # read images in given directories
         if init:
@@ -42,7 +50,12 @@ class DenseSift(object):
             return
 
     def extract_sift_descriptors(self, dense=True, patch_size=4, step_size=2):
+        """Extracts true SIFT keypoints from the image using OpenCV implementation of SIFT. In addition, densely sameples
+        the image for overlapping SIFT descriptors. Densely sampled SIFT points have the same size and unknown scale.
+        SIFT descriptors are computed for all the keypoints and stored in sorted order with respect to x and y coordinates
+        """
 
+        # return immediately if the corpus does not have any image for training
         if not self.corpus:
             return
 
@@ -50,13 +63,14 @@ class DenseSift(object):
         for key, I in self.corpus.items():
             keypoints = sift.detect(I, None)
 
-            # if dense option is True, compute dense overlapping SIFT descriptor
+            # if dense option is True, sample dense overlapping SIFT ketpoints
             if dense:
                 keypoint_dense_grid = []
                 for x in range(0, I.shape[0] - patch_size, step_size):
                     for y in range(0, I.shape[1] - patch_size, step_size):
                         keypoint_dense_grid.append(cv2.KeyPoint(x, y, patch_size))
 
+                # sort keypoints to foster efficient search during training and testing
                 keypoints.extend(keypoint_dense_grid)
                 keypoints.sort(key=lambda p: p.pt)
 
