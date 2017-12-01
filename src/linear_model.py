@@ -63,7 +63,7 @@ class LinearModel(ABC):
         return fpr, tpr, thresholds
 
 
-class LogisticRegression(LinearModel):
+class SupportVectorMachine(LinearModel):
 
     def __init__(self, X, y):
         """This is very basic logistic regression method to investigate linear model success on data """
