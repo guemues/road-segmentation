@@ -36,11 +36,14 @@ class Bow():
         # self.nn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(self.centers)
 
     def save(self, path):
-        file = os.path.join(path, "kmeans_ncenters_%d_dim_%d.pkl"%(self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1]))
+        file = os.path.join(path, "kmeans_ncenters_%d_dim_%d.pkl" % (
+        self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1]))
         joblib.dump(self.kmeans, file)
 
     def load(self, path):
-        self.kmeans = joblib.load(path)
+        file = os.path.join(path, "kmeans_ncenters_%d_dim_%d.pkl" % (
+             self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1]))
+        self.kmeans = joblib.load(file)
 
     def transform(self, feature):
         """Given a feature matrix for an image/patch, transform into normalized histogram of cluster centers. Each sample
