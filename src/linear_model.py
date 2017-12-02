@@ -11,7 +11,7 @@ from abc import ABC
 class LinearModel(ABC):
     def __init__(self, X, y):
         """
-        This is abstract class for all LiearModels
+        This is abstract class for all LinearModels
 
         :param X: The training X data, n * p array
         :param y: The training labels, n * 1 array  [1, 3, 5, 3, 1], not binarized
@@ -41,13 +41,13 @@ class LinearModel(ABC):
 
     @property
     def accuracy(self):
-        """ Return mean accuracy for every clas label"""
+        """ Return mean accuracy for every class label"""
         return np.mean(sum(self.model.predict(self.X_test) == self.y_test) / self.test_size)
 
     @property
     def roc(self):
         """ Return mean accuracy for every class label
-        :returns: It return 4 dict for false positive, true positive, and thresholds for these values
+        :returns: It returns 4 dict for false positive, true positive, and thresholds for these values
         :rtype: dict, dict, dict
         """
 
