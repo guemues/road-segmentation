@@ -15,13 +15,14 @@ class Bow():
     - Histogram is normalized into the 'transformed feature vector' of the given patch/image
     """
 
-    def __init__(self, num_centers=1000, norm="l1"):
+    def __init__(self, num_centers=1000, norm="l1", subsample=1):
         """parameter are initialized to default values
         """
         self.num_centers = num_centers
         self.norm = norm
         self.features = None
         self.kmeans = None
+        self.subsample = subsample
 
     def fit(self, features):
         """Takes in the training feature matrix and builds the K-Means model with specified number of centers
@@ -29,20 +30,25 @@ class Bow():
         :type features: ndarray (N-by-128)
         """
         self.features = features  # store training data for future trials
+        if self.subsample != 1:
+            self.subsampled_indices = np.random.permutation(np.arange(0,self.features.shape[0]))[:int(self.features.shape[0]*self.subsample)]
+            self.subsampled_features = self.features[self.subsampled_features,:]
+        else:
+            self.subsampled_features = self.features
         self.centers = np.empty((self.num_centers, self.features.shape[1]))
-        assert (self.features.shape[0] > self.num_centers)
+        assert (self.subsampled_features.shape[0] > self.num_centers)
 
-        self.kmeans = KMeans(n_clusters=self.num_centers, verbose=1, n_init=10, max_iter=200).fit(self.features)
+        self.kmeans = KMeans(n_clusters=self.num_centers, verbose=1).fit(self.subsampled_features)
         # self.nn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(self.centers)
 
     def save(self, path):
-        file = os.path.join(path, "kmeans_ncenters_%d_dim_%d.pkl" % (
-        self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1]))
+        file = os.path.join(path, "kmeans_ncenters_%d_dim_%d_subsample_%f.pkl" % (
+        self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1], self.subsample))
         joblib.dump(self.kmeans, file)
 
     def load(self, path):
-        file = os.path.join(path, "kmeans_ncenters_%d_dim_%d.pkl" % (
-             self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1]))
+        file = os.path.join(path, "kmeans_ncenters_%d_dim_%d_subsample_%f.pkl" % (
+             self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1], self.subsample))
         self.kmeans = joblib.load(file)
 
     def transform(self, feature):
