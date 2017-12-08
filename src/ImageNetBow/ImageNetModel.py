@@ -77,8 +77,7 @@ class ImageNetModel(object):
             # print("Processing batch %d patch %d" % (b, idx))
             histogram_map[int(x / self.step), int(y / self.step), :] = self.bow.transform(patch.reshape((-1,self.num_features)))
 
-        return histogram_map
-
+        return self.histogram_map_to_desc_list(histogram_map)
 
     def __generate_patches(self, im, window, step, im_label=None, rotate_list=[0]):
         height, width, channels = im.shape
@@ -121,6 +120,16 @@ class ImageNetModel(object):
         output = np.squeeze(self.dnn_model.forward(tensor.unsqueeze(0)).data.numpy())
         return output
 
+    def histogram_map_to_desc_list(self, histogram_map):
+        keypoints_list = []
+        descriptors_list = []
+        for xi in range(histogram_map.shape[0]):
+            for yi in range(histogram_map.shape[1]):
+                descriptors_list.append(histogram_map[xi, yi, :])
+                keypoints_list.append((xi*self.window,yi*self.window))
+
+        descriptors = np.array(descriptors_list)
+        return keypoints_list, descriptors
 
 if __name__ == "__main__":
     from data_loader import load_data

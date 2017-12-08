@@ -1,5 +1,5 @@
-
 import sys
+
 sys.path.append('/home/epfl/ftp/insta-network/src')
 
 import cv2, os
@@ -90,7 +90,3 @@ class DenseSift(object):
 
     def get_sift_points(self):
         return self.SIFT_points
-
-
-
-
