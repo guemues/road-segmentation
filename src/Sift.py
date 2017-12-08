@@ -49,8 +49,8 @@ class DenseSift(object):
         else:
             return
 
-    def extract_sift_descriptors(self, dense=True, patch_size=4, step_size=2):
-        """Extracts true SIFT keypoints from the image using OpenCV implementation of SIFT. In addition, densely sameples
+    def extract_sift_descriptors(self, dense=True, patch_size=16, step_size=2):
+        """Extracts true SIFT keypoints from the image using OpenCV implementation of SIFT. In addition, densely samples
         the image for overlapping SIFT descriptors. Densely sampled SIFT points have the same size and unknown scale.
         SIFT descriptors are computed for all the keypoints and stored in sorted order with respect to x and y coordinates
         """
@@ -60,14 +60,17 @@ class DenseSift(object):
             return
 
         sift = cv2.xfeatures2d.SIFT_create()  # create a SIFT descriptor instance
-        for key, I in self.corpus.items():
+        for key, img in self.corpus.items():
+            # reflect image borders so that we can extract features at the border pixels.
+            I = cv2.copyMakeBorder(img, np.int(patch_size/2), np.int(patch_size/2), np.int(patch_size/2), np.int(patch_size/2),
+                                   cv2.BORDER_REFLECT_101)
             keypoints = sift.detect(I, None)
 
             # if dense option is True, sample dense overlapping SIFT ketpoints
             if dense:
                 keypoint_dense_grid = []
-                for x in range(0, I.shape[0] - patch_size, step_size):
-                    for y in range(0, I.shape[1] - patch_size, step_size):
+                for x in range(np.int(patch_size/2), I.shape[0] - np.int(patch_size/2), step_size):
+                    for y in range(np.int(patch_size/2), I.shape[1] - patch_size, step_size):
                         keypoint_dense_grid.append(cv2.KeyPoint(x, y, patch_size))
 
                 # sort keypoints to foster efficient search during training and testing
@@ -76,6 +79,7 @@ class DenseSift(object):
 
             # compute SIFT descriptors for provided key points and save
             keypoints_, descriptors = sift.compute(I, keypoints)
+            keypoints_ = [(kp.pt[0] - np.int(patch_size/2), kp.pt[1] - np.int(patch_size/2)) for kp in keypoints_]
             self.SIFT_points[key] = (keypoints_, descriptors)
 
     def get_corpus(self):

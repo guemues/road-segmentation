@@ -89,8 +89,8 @@ class Tester(object):
         elif self.classifier == 'Logistic_Regression':
             self.model.fit_logistic_regression(self.data_generation_mode)
 
-    def predict(self, I, dense=True, patch_size=4, step_size=2):
-        """Predicts the labels for each pixels in the provided image. Depending on the prediction mode, computation differs
+    def extract(self, I, dense=True, patch_size=4, step_size=2):
+        """Given a test image, it extract SIFT descriptors together with coordinates.
 
         :type dense: bool,
         :type patch_size: int,
@@ -117,6 +117,11 @@ class Tester(object):
         # compute SIFT descriptors for provided key points for the test image
         keypoints, descriptors = sift.compute(I, keypoints)
 
+        return keypoints, descriptors
+
+    def transform(self, keypoints, descriptors, size, threshold=0.5):
+        """Predict the pixel labels for given keypoints and SIFT descriptors"""
+
         # Using a sliding window, go over the whole image, compute normalized histogram feature for the patches using
         # the SIFT descriptors extracted from the test image. Predict the label of the patch and compute the probability
         # of belonging to that label. For each pixel, assign the maximum of current probability and previous maximum
@@ -128,28 +133,22 @@ class Tester(object):
                 for i, kp in enumerate(keypoints):
                     # compute the descriptors that fall into the patch
                     if is_within_window(kp.pt, (x, y), self.WINDOW_SIZE):
-                        feature = feature + (descriptors[i, :].reshape(1,-1),)
+                        feature = feature + (descriptors[i, :].reshape(1, -1),)
 
                 # compute feature vector out of descriptors and predict the label together with confidence score (probability)
                 image_features = self.model.bow_model.transform(np.concatenate(feature, axis=0))
                 prob = self.model.svm_model.predict_proba(image_features)
                 prob_window = prob[0, 1] * np.ones((self.WINDOW_SIZE, self.WINDOW_SIZE))
-                prediction_grid[y:y+self.WINDOW_SIZE, x:x+self.WINDOW_SIZE] = \
-                    np.maximum(prediction_grid[y:y+self.WINDOW_SIZE, x:x+self.WINDOW_SIZE], prob_window)
+                prediction_grid[y:y + self.WINDOW_SIZE, x:x + self.WINDOW_SIZE] = \
+                    np.maximum(prediction_grid[y:y + self.WINDOW_SIZE, x:x + self.WINDOW_SIZE], prob_window)
 
         return prediction_grid
 
-    def transform(self, data):
-        """Predict the pixel labels for each image in the test set corpus of the Tester instance"""
+    def extract_transform(self, I, dense=True, patch_size=4, step_size=2):
+        """Given a test image, it predicts the labels of each pixel"""
 
-        self.populate_test_examples(data)
+        keypoints, descriptors = self.extract(I, dense=True, patch_size=4, step_size=2)
+        return self.transform(keypoints, descriptors)
 
-        image_ids = []
-        predictions = {}
-        for key, I in self.test_set.items():
-            image_ids.append(key)
-            predictions[key] = self.predict(I)
-
-        return image_ids, predictions
 
 
