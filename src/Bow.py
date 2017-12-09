@@ -31,8 +31,9 @@ class Bow():
         """
         self.features = features  # store training data for future trials
         if self.subsample != 1:
-            self.subsampled_indices = np.random.permutation(np.arange(0,self.features.shape[0]))[:int(self.features.shape[0]*self.subsample)]
-            self.subsampled_features = self.features[self.subsampled_features,:]
+            self.subsampled_indices = np.random.permutation(np.arange(0, self.features.shape[0]))[
+                                      :int(self.features.shape[0] * self.subsample)]
+            self.subsampled_features = self.features[self.subsampled_features, :]
         else:
             self.subsampled_features = self.features
         self.centers = np.empty((self.num_centers, self.features.shape[1]))
@@ -43,12 +44,12 @@ class Bow():
 
     def save(self, path):
         file = os.path.join(path, "kmeans_ncenters_%d_dim_%d_subsample_%f.pkl" % (
-        self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1], self.subsample))
+            self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1], self.subsample))
         joblib.dump(self.kmeans, file)
 
     def load(self, path):
         file = os.path.join(path, "kmeans_ncenters_%d_dim_%d_subsample_%f.pkl" % (
-             self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1], self.subsample))
+            self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1], self.subsample))
         self.kmeans = joblib.load(file)
 
     def transform(self, feature):
