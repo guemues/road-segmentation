@@ -21,7 +21,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 
     best_model_wts = model.state_dict()
     best_acc = 0.0
-
+    i = 0
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
@@ -56,6 +56,13 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 outputs = model(inputs)
                 _, preds = torch.max(outputs.data, 1)
                 loss = criterion(outputs, labels)
+
+                print("[{}][{}/{}]".format(epoch,i, len(dataloaders["train"])))
+                i = i +1
+                print("Labels: {}".format(labels.data.numpy()))
+                print("Prediction: {}".format(preds.numpy()))
+                print("Accuracy: %.2f" % torch.mean((preds == labels.data).float()))
+                print("Negative Examples: %.2f" % torch.mean((0 == labels.data).float()))
 
                 # backward + optimize only if in training phase
                 if phase == 'train':
@@ -129,8 +136,8 @@ if __name__ == "__main__":
     def imshow(inp, title=None):
         """Imshow for Tensor."""
         inp = inp.numpy().transpose((1, 2, 0))
-        mean = np.array([0.485, 0.456, 0.406])
-        std = np.array([0.229, 0.224, 0.225])
+        mean = np.array([0.5, 0.5, 0.5])
+        std = np.array([0.25, 0.25, 0.25])
         inp = std * inp + mean
         inp = np.clip(inp, 0, 1)
         plt.imshow(inp)
@@ -139,13 +146,15 @@ if __name__ == "__main__":
         plt.pause(0.001)  # pause a bit so that plots are updated
 
 
-    # Get a batch of training data
-    inputs, classes = next(iter(dataloaders['train']))
+    for i in range(1):
+        # Get a batch of training data
+        inputs, classes = next(iter(dataloaders['train']))
 
-    # Make a grid from batch
-    out = torchvision.utils.make_grid(inputs)
+        # Make a grid from batch
+        out = torchvision.utils.make_grid(inputs)
 
-    imshow(out, title=[class_names[x] for x in classes])
+        imshow(out, title=[class_names[x] for x in classes])
+        plt.show()
 
     model_conv = torchvision.models.alexnet(pretrained=True)
     for name, param in model_conv.named_parameters():
