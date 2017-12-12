@@ -15,11 +15,12 @@ class Bow():
     - Histogram is normalized into the 'transformed feature vector' of the given patch/image
     """
 
-    def __init__(self, num_centers=1000, norm="l1", subsample=1):
+    def __init__(self, num_centers=500, norm="l1", subsample=1, dim=128):
         """parameter are initialized to default values
         """
         self.num_centers = num_centers
         self.norm = norm
+        self.dim = dim
         self.features = None
         self.kmeans = None
         self.subsample = subsample
@@ -41,14 +42,16 @@ class Bow():
         self.kmeans = KMeans(n_clusters=self.num_centers, verbose=1).fit(self.subsampled_features)
         # self.nn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(self.centers)
 
+        self.dim = self.kmeans.cluster_centers_.shape[1]
+
     def save(self, path):
         file = os.path.join(path, "kmeans_ncenters_%d_dim_%d_subsample_%f.pkl" % (
-        self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1], self.subsample))
+            self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1], self.subsample))
         joblib.dump(self.kmeans, file)
 
     def load(self, path):
         file = os.path.join(path, "kmeans_ncenters_%d_dim_%d_subsample_%f.pkl" % (
-             self.kmeans.cluster_centers_.shape[0], self.kmeans.cluster_centers_.shape[1], self.subsample))
+            self.num_centers, self.dim, self.subsample))
         self.kmeans = joblib.load(file)
 
     def transform(self, feature):
@@ -67,14 +70,14 @@ class Bow():
         # predict the cluster for each data row, and transform into normalized histogram feature vector
         labels = self.kmeans.predict(feature)
         hist, _ = np.histogram(labels.reshape(-1, 1), bins=np.arange(0, self.num_centers, 1))
-        return self.__normalize(hist)
+        return self.__normalize(hist.reshape(1,-1))
 
     def __normalize(self, feature):
         """given a histogram, normalizes with respect to some norm (L1 by default)"""
         if self.norm is None:
             return feature
         feature_norm = normalize(feature.astype(np.float64), norm=self.norm)
-        return feature_norm.reshape(-1, )
+        return feature_norm.reshape(1,-1)
 
 
 if __name__ == "__main__":

@@ -2,10 +2,12 @@
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
+from sklearn.externals import joblib
 from sklearn.svm import LinearSVC, SVC
+from sklearn.linear_model import LogisticRegression
 
 import cv2, os
-import sys
+import sys, time
 import numpy as np
 import matplotlib.pyplot as plt
 from os import listdir
@@ -37,8 +39,9 @@ class Trainer(object):
         self.training_set_road = np.array([])
         self.training_set_background = np.array([])
         self.svm_model = SVC(probability=True)
+        self.log_reg_model = LogisticRegression()
 
-    def fit_sift(self, data_dir=None, label_dir=None, init=False):
+    def fit_sift(self, data_dir=None, label_dir=None, load=False, save=False, path='/', init=False):
         """SIFT model is constructed with training data and respective groundtruth images
         given that directories that store training images and groundtruth are separate folders
 
@@ -46,15 +49,31 @@ class Trainer(object):
         :type label_dir: str
         :type init: bool
         """
-        self.sift_model.populate_corpus(data_dir, label_dir, init)
-        self.sift_model.extract_sift_descriptors()
 
-    def fit_bow(self):
+        self.sift_model.populate_corpus(data_dir, label_dir, init)
+
+        if load:
+            self.sift_model.load(path)
+        else:
+            self.sift_model.extract_sift_descriptors()
+
+        if save:
+            self.sift_model.save(path)
+
+    def fit_bow(self, load=False, save=False, path='/'):
         """Given SIFT model, extract descriptors and training BOW model with KMeans on descriptors"""
 
         # make sure Sift descriptors are extracted properly
-        assert (not self.sift_model.get_sift_points())
-        self.bow_model.fit(self.descriptor2features())
+        if not self.sift_model.get_sift_points():
+            raise AssertionError
+
+        if load:
+            self.bow_model.load(path)
+        else:
+            self.bow_model.fit(self.descriptor2features())
+
+        if save:
+            self.bow_model.save(path)
 
     def populate_corpus(self, data, label):
         """Populate the DenseSift instance with training images and respective groundtruth maps"""
@@ -67,7 +86,8 @@ class Trainer(object):
         """
 
         # make sure Sift descriptors are extracted properly
-        assert (not self.sift_model.get_sift_points())
+        if not self.sift_model.get_sift_points():
+            raise AssertionError
 
         tup = ()
         for key, kp_desc_pair in self.sift_model.get_sift_points().items():
@@ -94,13 +114,17 @@ class Trainer(object):
         data_road = ()
         data_background = ()
 
+        j = 1
         # patches are computed for each image iteratively
         for key, I in self.sift_model.get_sift_points().items():
+            print('Training: image patches generation for image {} is started'.format(j))
+            tic = time.time()
             image = self.sift_model.get_corpus()[key]
             truth = self.sift_model.get_groundtruth()[key]
             keypoints, descriptors = I
 
-            assert (window_size <= I.shape[0] & window_size <= I.shape[1])
+            # print('Image: {}, Image Size: {}, Window Size: {}'.format(key, image.shape, window_size))
+            assert (window_size <= image.shape[0] and window_size <= image.shape[1])
 
             # determine the sift descriptors that lie inside each patch and contruct a normalized histogram feature vector
             # for each patch where all the pixels in the center belong to the same class
@@ -108,20 +132,25 @@ class Trainer(object):
                 for y in range(0, image.shape[0] - window_size, step_size):
 
                     # check if all the pixels in the center, within a square of size 'confidence', belong to the same label
-                    if check_patch_confidence(truth, (x,y), window_size, confidence) >= 0:
+                    patch_label = check_patch_confidence(truth, (x,y), window_size, confidence)
+                    if patch_label >= 0:
                         feature = ()
                         for i, kp in enumerate(keypoints):
-                            if is_within_window(kp.pt, (x, y), window_size):
-                                feature = feature + (descriptors[i, :],)
+                            if is_within_window(kp, (x, y), window_size):
+                                feature = feature + (descriptors[i, :].reshape(1,-1),)
 
                         # convert from tuple to ndarray
                         feature = np.concatenate(feature, axis=0)
 
                         # store feature vector in respective class' data matrix
-                        if check_patch_confidence(truth, (x,y), window_size, confidence) == 0:
+                        if patch_label == 0:
                             data_road = data_road + (self.bow_model.transform(feature),)
                         else:
                             data_background = data_background + (self.bow_model.transform(feature),)
+
+            toc = time.time() - tic
+            print('Training: image patches generation for image {} is done in {}\n'.format(j, toc))
+            j = j+1
 
         # store training examples in instance variable
         self.training_patch_road = np.concatenate(data_road, axis=0)
@@ -144,7 +173,7 @@ class Trainer(object):
 
             # store each keypoints/descriptor in respective class label's matrix
             for i, kp in enumerate(keypoints):
-                if truth[np.int(kp.pt[1]), np.int(kp.pt[0])] == 1:
+                if truth[np.int(kp[1]), np.int(kp[0])] == 1:
                     data_road = data_road + (descriptors[i].reshape(1,-1),)
                 else:
                     data_background = data_background + (descriptors[i].reshape(1,-1),)
@@ -154,8 +183,8 @@ class Trainer(object):
             tmp_back = np.concatenate(data_background, axis=0)
 
             # compute normalized histogram features
-            data_set_road = data_set_road + (self.bow_model.transform(tmp_road).reshape(1,-1),)
-            data_set_background = data_set_background + (self.bow_model.transform(tmp_back).reshape(1,-1),)
+            data_set_road = data_set_road + (self.bow_model.transform(tmp_road),)
+            data_set_background = data_set_background + (self.bow_model.transform(tmp_back),)
 
         # store training feature matrices into respective instance variable
         self.training_set_road = np.concatenate(data_set_road, axis=0)
@@ -189,6 +218,15 @@ class Trainer(object):
                 (np.ones(self.training_patch_road.shape[0]), np.zeros(self.training_patch_background.shape[0])), axis=0)
 
         self.svm_model.fit(X, y)
+
+    def save(self, path, data_generation_mode='patch'):
+        file = os.path.join(path, "svm_data_mode_{}.pkl".format(data_generation_mode))
+        joblib.dump((self.svm_model, self.training_patch_road, self.training_patch_background), file)
+
+    def load(self, path, data_generation_mode='patch'):
+        file = os.path.join(path, "svm_data_mode_{}.pkl".format(data_generation_mode))
+        (self.svm_model, self.training_patch_road, self.training_patch_background) = joblib.load(file)
+
 
     def fit_logistic_regresion(self, data_generation_mode='image'):
         return
