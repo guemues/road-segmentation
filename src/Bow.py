@@ -32,8 +32,9 @@ class Bow():
         """
         self.features = features  # store training data for future trials
         if self.subsample != 1:
-            self.subsampled_indices = np.random.permutation(np.arange(0,self.features.shape[0]))[:int(self.features.shape[0]*self.subsample)]
-            self.subsampled_features = self.features[self.subsampled_features,:]
+            self.subsampled_indices = np.random.permutation(np.arange(0, self.features.shape[0]))[
+                                      :int(self.features.shape[0] * self.subsample)]
+            self.subsampled_features = self.features[self.subsampled_features, :]
         else:
             self.subsampled_features = self.features
         self.centers = np.empty((self.num_centers, self.features.shape[1]))
