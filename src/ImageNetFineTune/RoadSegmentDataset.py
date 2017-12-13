@@ -39,7 +39,7 @@ class RoadSegmentDataset(Dataset):
 
         self.confidence_window = confidence_window
         self.transform = transforms.Compose([transforms.Scale((224, 224)),
-                                             transforms.RandomHorizontalFlip(),
+                                             #transforms.RandomHorizontalFlip(),
                                              transforms.ToTensor(),
                                              transforms.Normalize([0.5, 0.5, 0.5], [0.25, 0.25, 0.25])
                                              ])
@@ -63,7 +63,7 @@ class RoadSegmentDataset(Dataset):
         crop_image = self.images_list[image_idx].crop((
             int(crop_x_loc - self.window_size / 2), int(crop_y_loc - self.window_size / 2),
             int(crop_x_loc + self.window_size / 2), int(crop_y_loc + self.window_size / 2)))
-        #crop_image.show()
+        #crop_image.resize((224,224)).show()
         crop_image = self.transform(crop_image)
 
         target_image_crop = self.target_images_list[image_idx].crop((int(crop_x_loc - self.confidence_window / 2),
@@ -90,7 +90,7 @@ class RoadSegmentDataset(Dataset):
 
 if __name__=="__main__":
     data_dir = './'
-    window_size = 100
+    window_size = 40
     step_size = 5
     confidence_window = 5
 
@@ -101,3 +101,9 @@ if __name__=="__main__":
     while True:
         idx= np.random.randint(len(dataset))
         crop_image, road = dataset[idx]
+        print(road)
+        image = crop_image.numpy().transpose((1,2,0)) *[0.25, 0.25, 0.25] + [0.5, 0.5, 0.5]
+        import matplotlib.pyplot as plt
+        plt.imshow(image)
+        plt.title(str(road))
+        plt.show()

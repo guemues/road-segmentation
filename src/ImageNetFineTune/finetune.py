@@ -59,9 +59,10 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 
                 print("[{}][{}/{}]".format(epoch,i, len(dataloaders["train"])))
                 i = i +1
-                print("Labels: {}".format(labels.data.numpy()))
+                print("Labels:     {}".format(labels.data.numpy()))
                 print("Prediction: {}".format(preds.numpy()))
                 print("Accuracy: %.2f" % torch.mean((preds == labels.data).float()))
+                print("Recall  : %.2f" % torch.mean(()))
                 print("Negative Examples: %.2f" % torch.mean((0 == labels.data).float()))
 
                 # backward + optimize only if in training phase
