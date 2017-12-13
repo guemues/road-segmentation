@@ -51,7 +51,10 @@ class DenseSift(object):
             # populate corpus of images and groundtruth
             for i, f in enumerate(image_files):
                 self.corpus[image_files[i]] = cv2.imread(join(data, image_files[i]), 0)
-                self.groundtruth[label_files[i]] = cv2.imread(join(label, label_files[i]), 0)
+                I = cv2.imread(join(label, label_files[i]), 0)
+                I[I < 128] = np.uint8(0)
+                I[I >= 128] = np.uint8(1)
+                self.groundtruth[label_files[i]] = I
 
         else:
             return

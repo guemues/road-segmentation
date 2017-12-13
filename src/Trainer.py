@@ -4,7 +4,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 from sklearn.externals import joblib
 from sklearn.svm import LinearSVC, SVC
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 
 import cv2, os
 import sys, time
@@ -38,8 +38,9 @@ class Trainer(object):
         self.training_patch_background = np.array([])
         self.training_set_road = np.array([])
         self.training_set_background = np.array([])
-        self.svm_model = SVC(probability=True)
-        self.log_reg_model = LogisticRegression()
+        self.svm_model = SVC(class_weight='balanced', probability=True, verbose=1)
+        # self.log_reg_model = LogisticRegression(class_weight="balanced", verbose=1)
+        self.log_reg_model = LogisticRegressionCV(Cs=50, class_weight="balanced", tol=1e-8, max_iter=1000, verbose=1)
 
     def fit_sift(self, data_dir=None, label_dir=None, load=False, save=False, path='/', init=False):
         """SIFT model is constructed with training data and respective groundtruth images
@@ -117,40 +118,63 @@ class Trainer(object):
         j = 1
         # patches are computed for each image iteratively
         for key, I in self.sift_model.get_sift_points().items():
-            print('Training: image patches generation for image {} is started'.format(j))
-            tic = time.time()
-            image = self.sift_model.get_corpus()[key]
-            truth = self.sift_model.get_groundtruth()[key]
-            keypoints, descriptors = I
+            if key in self.sift_model.corpus.keys():
+                print('Training image {}, patch generation has started'.format(key))
+                tic = time.time()
+                image = self.sift_model.get_corpus()[key]
+                truth = self.sift_model.get_groundtruth()[key]
+                keypoints, descriptors = I
 
-            # print('Image: {}, Image Size: {}, Window Size: {}'.format(key, image.shape, window_size))
-            assert (window_size <= image.shape[0] and window_size <= image.shape[1])
+                # print('Image: {}, Image Size: {}, Window Size: {}'.format(key, image.shape, window_size))
+                assert (window_size <= image.shape[0] and window_size <= image.shape[1])
 
-            # determine the sift descriptors that lie inside each patch and contruct a normalized histogram feature vector
-            # for each patch where all the pixels in the center belong to the same class
-            for x in range(0, image.shape[1] - window_size, step_size):
-                for y in range(0, image.shape[0] - window_size, step_size):
 
-                    # check if all the pixels in the center, within a square of size 'confidence', belong to the same label
-                    patch_label = check_patch_confidence(truth, (x,y), window_size, confidence)
-                    if patch_label >= 0:
-                        feature = ()
-                        for i, kp in enumerate(keypoints):
-                            if is_within_window(kp, (x, y), window_size):
-                                feature = feature + (descriptors[i, :].reshape(1,-1),)
+                sift_step_size = 8
+                descriptor_map = np.zeros(shape=(int(image.shape[1]/sift_step_size)+1, int(image.shape[0]/sift_step_size)+1, 128))
+                true_map = np.zeros(
+                    shape=(int(image.shape[1] / sift_step_size), int(image.shape[0] / sift_step_size)), dtype=np.bool)
+                for k, d in zip(keypoints, descriptors):
+                    x, y = int(k[0]/sift_step_size), int(k[1]/sift_step_size)
+                    descriptor_map[y,x,:] = d
+                    true_map[y,x]=True
 
-                        # convert from tuple to ndarray
-                        feature = np.concatenate(feature, axis=0)
+                # determine the sift descriptors that lie inside each patch and contruct a normalized histogram feature vector
+                # for each patch where all the pixels in the center belong to the same class
+                for x in range(0, image.shape[1] - window_size, step_size):
+                    for y in range(0, image.shape[0] - window_size, step_size):
 
-                        # store feature vector in respective class' data matrix
-                        if patch_label == 0:
-                            data_road = data_road + (self.bow_model.transform(feature),)
-                        else:
-                            data_background = data_background + (self.bow_model.transform(feature),)
+                        # check if all the pixels in the center, within a square of size 'confidence', belong to the same label
+                        patch_label = check_patch_confidence(truth, (x,y), window_size, confidence)
+                        if patch_label >= 0:
+                            # feature = ()
+                            # for i, kp in enumerate(keypoints):
+                            #     if is_within_window(kp, (x, y), window_size):
+                            #         feature = feature + (descriptors[i, :].reshape(1,-1),)
+                            #
+                            # # convert from tuple to ndarray
+                            # feature = np.concatenate(feature, axis=0)
 
-            toc = time.time() - tic
-            print('Training: image patches generation for image {} is done in {}\n'.format(j, toc))
-            j = j+1
+                            tic_ = time.time()
+                            x_ = x / sift_step_size
+                            y_ = y / sift_step_size
+                            min_x = max(0, int(x_))
+                            max_x = min(descriptor_map.shape[1], int(x_+window_size/sift_step_size))
+                            min_y = max(0, int(y_))
+                            max_y = min(descriptor_map.shape[0], int(y_+window_size/sift_step_size))
+
+                            feature = descriptor_map[min_y:max_y, min_x:max_x, :].reshape((-1, 128))
+                            #print('Feature histogram generation in {}'.format(time.time() - tic_))
+
+
+                            # store feature vector in respective class' data matrix
+                            if patch_label == 1:
+                                data_road = data_road + (self.bow_model.transform(feature),)
+                            else:
+                                data_background = data_background + (self.bow_model.transform(feature),)
+
+                toc = time.time() - tic
+                print('Training image {}, patch generation has completed in {}\n'.format(j, toc))
+                j = j+1
 
         # store training examples in instance variable
         self.training_patch_road = np.concatenate(data_road, axis=0)
@@ -190,7 +214,7 @@ class Trainer(object):
         self.training_set_road = np.concatenate(data_set_road, axis=0)
         self.training_set_background = np.concatenate(data_set_background, axis=0)
 
-    def fit_svm(self, data_generation_mode='image'):
+    def fit(self, data_generation_mode='image'):
         """Train the binary SVM model for the training data generated and stored. Two training modes: image and patch.
         In the image training mode, training images are generated based in descriptors in the whole image. In the patch
         mode training images are the overlapping patches in the images. A patch is considered as a proper training image
@@ -217,15 +241,15 @@ class Trainer(object):
             y = np.concatenate(
                 (np.ones(self.training_patch_road.shape[0]), np.zeros(self.training_patch_background.shape[0])), axis=0)
 
-        self.svm_model.fit(X, y)
+        self.log_reg_model.fit(X, y)
 
     def save(self, path, data_generation_mode='patch'):
-        file = os.path.join(path, "svm_data_mode_{}.pkl".format(data_generation_mode))
-        joblib.dump((self.svm_model, self.training_patch_road, self.training_patch_background), file)
+        file = os.path.join(path, "logreg_data_mode_{}.pkl".format(data_generation_mode))
+        joblib.dump((self.log_reg_model, self.training_patch_road, self.training_patch_background), file)
 
     def load(self, path, data_generation_mode='patch'):
-        file = os.path.join(path, "svm_data_mode_{}.pkl".format(data_generation_mode))
-        (self.svm_model, self.training_patch_road, self.training_patch_background) = joblib.load(file)
+        file = os.path.join(path, "logreg_data_mode_{}.pkl".format(data_generation_mode))
+        (self.log_reg_model, self.training_patch_road, self.training_patch_background) = joblib.load(file)
 
 
     def fit_logistic_regresion(self, data_generation_mode='image'):

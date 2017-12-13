@@ -27,7 +27,7 @@ class Tester(object):
     PREDICTION_MODE = ['sliding_window', 'pixel_prediction'] # prediction strategy (More on report and comments)
     WINDOW_SIZE = 40 # window size for generating training data in patch mode
     CONFIDENCE = 6 # size of the confidence region in center of patches, required for patch mode training example generation
-    STEP_SIZE = 2 # step size of patch generation
+    STEP_SIZE = 6 # step size of patch generation
     CLASSIFIER = ['SVM', 'Logistic_Regression'] # classifier type specification
 
     def __init__(self, test_dir=None, init=False):
@@ -49,8 +49,8 @@ class Tester(object):
             self.test_set[image_files[i]] = cv2.imread(join(test_dir, image_files[i]), 0)
 
     def fit(self, data_dir, label_dir, initialize_model=False, data_generation_mode='patch',
-                         prediction_mode='sliding_window', classifier='SVM', load_bow=False, save_bow=True,
-                        load_sift=False, save_sift=True, load_svm=True, save_svm=False, path='/', init=False):
+                         prediction_mode='sliding_window', classifier='Logistic_Regression', load_bow=False, save_bow=True,
+                        load_sift=False, save_sift=True, load_model=True, save_model=False, path='/', init=False):
         """Prepares the environment for testing. Trains the SIFT and BOW models initially, with the images and groundtruth
         in the given directories. Training data is produces with respect to the choice of data generation mode. Finally,
         binary classifier is trained based on the data samples generated"""
@@ -80,23 +80,32 @@ class Tester(object):
         self.model.fit_bow(load=load_bow, save=save_bow, path=path)
 
         # generate training data based on previously set data generation mode
-        if not load_svm:
+        if not load_model:
             if self.data_generation_mode == 'image':
                 self.model.generate_image_training_set()
             else:
                 self.model.generate_patch_training_set(self.WINDOW_SIZE, self.CONFIDENCE, self.CONFIDENCE)
 
         # finally, train the binary classifier
-        if self.classifier == 'SVM':
-            if load_svm:
+        if self.classifier == 'Logistic_Regression':
+            if load_model:
                 self.model.load(path)
             else:
-                self.model.fit_svm(self.data_generation_mode)
+                self.model.fit(self.data_generation_mode)
 
-            if save_svm:
+            if save_model:
                 self.model.save(path)
-        elif self.classifier == 'Logistic_Regression':
-            self.model.fit_logistic_regression(self.data_generation_mode)
+        elif self.classifier == 'SVM':
+            return
+
+        # # For Testing purposes only
+        # road_subsample_idx = np.random.randint(self.model.training_patch_road.shape[0], size=np.int(self.model.training_patch_road.shape[0]/20))
+        # self.model.training_patch_road = self.model.training_patch_road[road_subsample_idx, :]
+        # back_subsample_idx = np.random.randint(self.model.training_patch_background.shape[0], size=np.int(self.model.training_patch_background.shape[0]/20))
+        # self.model.training_patch_background = self.model.training_patch_background[back_subsample_idx, :]
+        #
+        # self.model.svm_model = SVC(class_weight='balanced', probability=True)
+        # self.model.fit_svm(self.data_generation_mode)
 
     def extract(self, img, dense=True, patch_size=4, step_size=2):
         """Given a test image, it extract SIFT descriptors together with coordinates.
@@ -129,37 +138,57 @@ class Tester(object):
             keypoints.extend(keypoint_dense_grid)
             keypoints.sort(key=lambda p: p.pt)
 
-            # compute SIFT descriptors for provided key points and save
+        # compute SIFT descriptors for provided key points and save
         keypoints, descriptors = sift.compute(I, keypoints)
         keypoints = [(kp.pt[0] - np.int(patch_size / 2), kp.pt[1] - np.int(patch_size / 2)) for kp in keypoints]
 
         return keypoints, descriptors
 
-    def transform(self, keypoints, descriptors, size, threshold=0.5):
+    def transform(self, keypoints, descriptors, size, sift_step_size, threshold=0.5):
         """Predict the pixel labels for given keypoints and SIFT descriptors"""
 
         # Using a sliding window, go over the whole image, compute normalized histogram feature for the patches using
         # the SIFT descriptors extracted from the test image. Predict the label of the patch and compute the probability
         # of belonging to that label. For each pixel, assign the maximum of current probability and previous maximum
         # Refer to the report for more details on the method
+        sift_step_size = 8
+        descriptor_map = np.zeros(
+            shape=(int(size[1] / sift_step_size) + 1, int(size[0] / sift_step_size) + 1, 128))
+        true_map = np.zeros(
+            shape=(int(size[1] / sift_step_size), int(size[0] / sift_step_size)), dtype=np.bool)
+        for k, d in zip(keypoints, descriptors):
+            x, y = int(k[1] / sift_step_size), int(k[0] / sift_step_size)
+            descriptor_map[y, x, :] = d
+            true_map[y, x] = True
+
         prediction_grid = np.zeros(size)
         for x in range(0, size[1] - self.WINDOW_SIZE, 2):
-            print('image column: {}'.format(x))
+            # print('image column: {}'.format(x))
             for y in range(0, size[0] - self.WINDOW_SIZE, 2):
-                feature = ()
-                tic = time.time()
-                for i, kp in enumerate(keypoints):
-                    # compute the descriptors that fall into the patch
-                    if is_within_window(kp, (x, y), self.WINDOW_SIZE):
-                        feature = feature + (descriptors[i, :].reshape(1, -1),)
-                print('Window ({},{}) features in {}'.format(x, y, time.time() - tic))
+                # feature = ()
+                # tic = time.time()
+                # for i, kp in enumerate(keypoints):
+                #     # compute the descriptors that fall into the patch
+                #     if is_within_window(kp, (x, y), self.WINDOW_SIZE):
+                #         feature = feature + (descriptors[i, :].reshape(1, -1),)
+                # print('Window ({},{}) features in {}'.format(x, y, time.time() - tic))
+            # feature = np.concatenate(feature, axis=0)
+
+                x_ = x / sift_step_size
+                y_ = y / sift_step_size
+                min_x = max(0, int(x_))
+                max_x = min(descriptor_map.shape[1], int(x_ + self.WINDOW_SIZE / sift_step_size))
+                min_y = max(0, int(y_))
+                max_y = min(descriptor_map.shape[0], int(y_ + self.WINDOW_SIZE / sift_step_size))
+
+                feature = descriptor_map[min_y:max_y, min_x:max_x, :].reshape((-1, 128))
 
 
                 # compute feature vector out of descriptors and predict the label together with confidence score (probability)
-                image_features = self.model.bow_model.transform(np.concatenate(feature, axis=0))
-                prob = self.model.svm_model.predict_proba(image_features)
-                # print('Shape of Prob: {}'.format(prob.shape))
-                prob_window = prob[0, 1] * np.ones((self.WINDOW_SIZE, self.WINDOW_SIZE))
+                image_features = self.model.bow_model.transform(feature)
+                prob = self.model.log_reg_model.predict_proba(image_features)
+                # print('Prob: {}'.format(prob))
+                prob_window = prob[0,1] * np.ones((self.WINDOW_SIZE, self.WINDOW_SIZE))
                 prediction_grid[y:y + self.WINDOW_SIZE, x:x + self.WINDOW_SIZE] = \
                     np.maximum(prediction_grid[y:y + self.WINDOW_SIZE, x:x + self.WINDOW_SIZE], prob_window)
 
@@ -169,7 +198,7 @@ class Tester(object):
         """Given a test image, it predicts the labels of each pixel"""
 
         keypoints, descriptors = self.extract(I, dense=True, patch_size=4, step_size=2)
-        return self.transform(keypoints, descriptors, I.shape)
+        return self.transform(keypoints, descriptors, I.shape, 8)
 
 
 
