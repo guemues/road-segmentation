@@ -1,4 +1,3 @@
-
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize

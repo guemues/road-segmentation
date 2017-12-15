@@ -1,5 +1,7 @@
-from sklearn import datasets
-from linear_model import SupportVectorMachine
+from sklearn import datasets, svm
+from sklearn.multiclass import OneVsRestClassifier
+
+from linear_model import LinearModel
 
 
 def test_logistic_regression():
@@ -9,7 +11,15 @@ def test_logistic_regression():
     iris_X = iris.data
     iris_y = iris.target
 
-    linear_model = SupportVectorMachine(iris_X, iris_y)
+    classifier = OneVsRestClassifier(
+        svm.SVC(
+            kernel='linear',
+            probability=True)
+    )
+    linear_model = LinearModel(iris_X, iris_y, classifier)
+
+    linear_model.cross_validation()
+    linear_model.train()
 
     test_accuracy = linear_model.accuracy
     assert test_accuracy > 0.5  # test accuracy must be bigger then 0.5
