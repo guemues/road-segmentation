@@ -28,7 +28,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     since = time.time()
     train_predictions = np.zeros((100, 400, 400), dtype=np.float32)
     val_predictions = np.zeros((10, 400, 400),dtype=np.float32)
-    test_predictions = np.zeros((10, 400, 400),dtype=np.float32)
+    test_predictions = np.zeros((50, 608, 608),dtype=np.float32)
 
     best_model_wts = model.state_dict()
     best_acc = 0.0
@@ -39,7 +39,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
         i = 0
 
         # Each epoch has a training and validation phase
-        for phase in ['train', 'val']:
+        for phase in ['test', 'val', 'train']:
             f1_score_list = np.array([])
             if phase == 'train':
                 scheduler.step()
@@ -67,21 +67,24 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 
                 # forward
                 outputs = model(inputs)
-                if phase == "train" or phase == "val":
-                    pred_step_size = 5
-                    for idx in range(batch_size):
-                        crop_x_loc = crop_x_loc_list[idx]
-                        crop_y_loc = crop_y_loc_list[idx]
-                        min_x = max(0, crop_x_loc - int(pred_step_size / 2))
-                        max_x = min(400, crop_x_loc + int(pred_step_size / 2))
-                        min_y = max(0, crop_y_loc - int(pred_step_size / 2))
-                        max_y = min(400, crop_y_loc + int(pred_step_size / 2))
-                        if phase == "train":
-                            train_predictions[image_idx[idx], min_x:max_x, min_y:max_y] = softmax(
-                                outputs[idx].cpu().data.numpy())[0]
-                        elif phase == "val":
-                            val_predictions[image_idx[idx], min_x:max_x, min_y:max_y] = softmax(
-                                outputs[idx].cpu().data.numpy())[0]
+                pred_step_size = 5
+                max_len = 400 if phase=="train" or phase=="val" else 608
+                for idx in range(inputs.size(0)):
+                    crop_x_loc = crop_x_loc_list[idx]
+                    crop_y_loc = crop_y_loc_list[idx]
+                    min_x = max(0, crop_x_loc - int(pred_step_size / 2))
+                    max_x = min(max_len, crop_x_loc + int(pred_step_size / 2))
+                    min_y = max(0, crop_y_loc - int(pred_step_size / 2))
+                    max_y = min(max_len, crop_y_loc + int(pred_step_size / 2))
+                    if phase == "train":
+                        train_predictions[image_idx[idx], min_y:max_y, min_x:max_x] = softmax(
+                            outputs[idx].cpu().data.numpy())[0]
+                    elif phase == "val":
+                        val_predictions[image_idx[idx], min_y:max_y, min_x:max_x] = softmax(
+                            outputs[idx].cpu().data.numpy())[0]
+                    elif phase =="test":
+                        test_predictions[image_idx[idx], min_y:max_y, min_x:max_x] = softmax(
+                            outputs[idx].cpu().data.numpy())[0]
 
                 _, preds = torch.max(outputs.data, 1)
                 loss = criterion(outputs, labels)
@@ -115,12 +118,17 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             for i in range(train_predictions.shape[0]):
                 train_pred = train_predictions[i, :, :]
                 train_pred = train_pred * 255
-                imsave("./pred/train_pred%i.png"%i, train_pred)
+                imsave("./pred/train_pred%i_epoch%d.png"%(i,epoch), train_pred)
 
             for i in range(val_predictions.shape[0]):
                 val_pred = val_predictions[i, :, :]
                 val_pred = val_pred * 255
-                imsave("./pred/train_pred%i.png"%i, val_pred)
+                imsave("./pred/val_pred%i_epoch_%d.png"%(i,epoch), val_pred)
+
+            for i in range(test_predictions.shape[0]):
+                test_pred = test_predictions[i, :, :]
+                test_pred = test_pred * 255
+                imsave("./pred/test_pred%i_epoch_%d.png"%(i,epoch), test_pred)
 
 
             epoch_loss = running_loss / dataset_sizes[phase]
@@ -175,11 +183,11 @@ if __name__ == "__main__":
     image_datasets = {x: RoadSegmentDataset(os.path.join(data_dir, x),
                                             os.path.join(data_dir, x + "_label"), window_size, step_size,
                                             confidence_window)
-                      for x in ['train', 'val']}
+                      for x in ['train', 'val', "test"]}
     dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size,
-                                                  shuffle=x == "train", num_workers=4)
-                   for x in ['train', 'val']}
-    dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
+                                                  shuffle=(x=="train"), num_workers=4)
+                   for x in ['test', 'val', 'train']}
+    dataset_sizes = {x: len(image_datasets[x]) for x in ['test', 'val', "train"]}
     class_names = ["Not Road", "Road"]
 
 
@@ -211,6 +219,7 @@ if __name__ == "__main__":
     for param in model_conv.parameters():
         param.requires_grad = False
 
+    print(model_conv)
     # Parameters of newly constructed modules have requires_grad=True by default
     num_ftrs = model_conv.fc.in_features
     model_conv.fc = nn.Linear(num_ftrs, 2)

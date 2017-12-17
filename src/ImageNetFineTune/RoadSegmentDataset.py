@@ -26,19 +26,20 @@ class RoadSegmentDataset(Dataset):
         self.window_size = window_size
         self.step_size = step_size
         self.image_names_list = [image_name for image_name in os.listdir(path) if
-                            image_name.endswith(".png")]
+                                 image_name.endswith(".png")]
         self.images_list = [Image.open(os.path.join(path, image_name)) for image_name in os.listdir(path) if
                             image_name.endswith(".png")]
-        self.target_images_list = [Image.open(os.path.join(target_path, image_name)) for image_name in
-                                   os.listdir(target_path) if image_name.endswith(".png")]
-        self.target_images_list = [im.point(lambda x: 0 if x < 125 else 255, '1') for im in
-                                   self.target_images_list]  # turn into black and white
-
+        self.have_labels = os.path.isdir(target_path)
+        if self.have_labels:
+            self.target_images_list = [Image.open(os.path.join(target_path, image_name)) for image_name in
+                                       os.listdir(target_path) if image_name.endswith(".png")]
+            self.target_images_list = [im.point(lambda x: 0 if x < 125 else 255, '1') for im in
+                                       self.target_images_list]  # turn into black and white
         self.confidence_window = confidence_window
         self.transform = transforms.Compose([transforms.Scale((224, 224)),
                                              transforms.RandomHorizontalFlip(),
                                              transforms.ToTensor(),
-                                             #Rotation(90),
+                                             # Rotation(90),
                                              transforms.Normalize([0.5, 0.5, 0.5], [0.25, 0.25, 0.25])
                                              ])
 
@@ -64,26 +65,28 @@ class RoadSegmentDataset(Dataset):
         # crop_image.resize((224,224)).show()
         crop_image = self.transform(crop_image)
 
-        target_image_crop = self.target_images_list[image_idx].crop((int(crop_x_loc - self.confidence_window / 2),
-                                                                     int(crop_y_loc - self.confidence_window / 2),
-                                                                     int(crop_x_loc + self.confidence_window / 2),
-                                                                     int(crop_y_loc + self.confidence_window / 2)))
+        if self.have_labels:
+            target_image_crop = self.target_images_list[image_idx].crop((int(crop_x_loc - self.confidence_window / 2),
+                                                                         int(crop_y_loc - self.confidence_window / 2),
+                                                                         int(crop_x_loc + self.confidence_window / 2),
+                                                                         int(crop_y_loc + self.confidence_window / 2)))
 
-        """
-        self.target_images_list[image_idx].crop((int(crop_x_loc - self.window_size / 2),
-                                                 int(crop_y_loc - self.window_size / 2),
-                                                 int(crop_x_loc + self.window_size / 2),
-                                                 int(crop_y_loc + self.window_size / 2))).show()
-        """
+            """
+            self.target_images_list[image_idx].crop((int(crop_x_loc - self.window_size / 2),
+                                                     int(crop_y_loc - self.window_size / 2),
+                                                     int(crop_x_loc + self.window_size / 2),
+                                                     int(crop_y_loc + self.window_size / 2))).show()
+            """
 
-        sum = 0
-        for i in range(target_image_crop.width):
-            for j in range(target_image_crop.height):
-                sum = sum + target_image_crop.getpixel((i, j)) / 255
-        road = sum > target_image_crop.height * target_image_crop.width * 0.3
-        road = int(road)
+            sum = 0
+            for i in range(target_image_crop.width):
+                for j in range(target_image_crop.height):
+                    sum = sum + target_image_crop.getpixel((i, j)) / 255
+            road = sum > target_image_crop.height * target_image_crop.width * 0.3
+            road = int(road)
+        else:
+            road=False
 
-        # print(image_idx, crop_x_loc, crop_y_loc, road)
         image_name = self.image_names_list
         return crop_image, road, image_idx, crop_x_loc, crop_y_loc
 
