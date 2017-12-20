@@ -1,15 +1,26 @@
 import numpy as np
 from numpy import ndarray
 from sklearn import linear_model, svm
-from sklearn.cross_validation import train_test_split
+from sklearn.cross_validation import train_test_split, KFold
 from sklearn.metrics import roc_curve, auc
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.preprocessing import label_binarize
 from abc import ABC
+from sklearn.model_selection import KFold
 
 
-class LinearModel(ABC):
-    def __init__(self, X, y):
+def require_train(f):
+    def wrapper(self, *args):
+        if self.model is None:
+            raise Exception("Model is not trained")
+        return f(self, *args)
+
+    return wrapper
+
+
+class LinearModel:
+
+    def __init__(self, X, y, classifier):
         """
         This is abstract class for all LinearModels
 
@@ -37,19 +48,45 @@ class LinearModel(ABC):
         self.test_size = len(self.y_test)
         self.train_size = len(self.X_test)
 
+        self.classifier = classifier
+
         self.model = None
+        # self.model = self.classifier.fit(self.X_train, self.y_train)
+
+    def cross_validation(self):
+        accuracies = []
+        kf = KFold(n_splits=10)
+        for train_index, test_index in kf.split(self.X_train):
+            X_train, X_validation = self.X_train[train_index], self.X_train[test_index]
+            y_train, y_validation = self.y_train[train_index], self.y_train[test_index]
+
+            model_validation = self.classifier.fit(X_train, y_train)
+            accuracies.append(np.mean(sum(model_validation.predict(X_validation) == y_validation) / len(y_validation)))
+        cross_validation_accuracy = np.mean(accuracies)
+        print("""Cross validation accuracy with 10 fold: {}""".format(cross_validation_accuracy))
+        return cross_validation_accuracy
+
+    def train(self):
+        self.model = self.classifier.fit(self.X_train, self.y_train)
 
     @property
+    @require_train
     def accuracy(self):
         """ Return mean accuracy for every class label"""
+        if self.model is None:
+            raise Exception("Model is not trained")
+
         return np.mean(sum(self.model.predict(self.X_test) == self.y_test) / self.test_size)
 
     @property
+    @require_train
     def roc(self):
         """ Return mean accuracy for every class label
         :returns: It returns 4 dict for false positive, true positive, and thresholds for these values
         :rtype: dict, dict, dict
         """
+        if self.model is None:
+            raise Exception("Model is not trained")
 
         y_score = self.model.decision_function(self.X_test)
 
@@ -61,18 +98,3 @@ class LinearModel(ABC):
             fpr[i], tpr[i], thresholds[i] = roc_curve(self.y_test[:, i], y_score[:, i])
 
         return fpr, tpr, thresholds
-
-
-class SupportVectorMachine(LinearModel):
-
-    def __init__(self, X, y):
-        """This is very basic logistic regression method to investigate linear model success on data """
-
-        super().__init__(X, y)
-        self.classifier = OneVsRestClassifier(
-            svm.SVC(
-                kernel='linear',
-                probability=True)
-        )
-
-        self.model = self.classifier.fit(self.X_train, self.y_train)
