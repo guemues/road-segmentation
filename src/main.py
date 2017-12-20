@@ -21,32 +21,40 @@ from sklearn.model_selection import cross_val_score
 
 def main():
 
-    data_dir = '/home/ali/Dropbox/Courses/CS-433/road-segmentation/training_images'
-    label_dir = '/home/ali/Dropbox/Courses/CS-433/road-segmentation/training_groundtruth'
-    test_dir = '/home/ali/Dropbox/Courses/CS-433/road-segmentation/test_images'
-    path = '/home/ali/Dropbox/Courses/CS-433/road-segmentation/src'
+    if len(sys.argv) != 5:
+        print('Please enter directories for training images, groundtruth images, test images and path to saving models in given order')
+        return
+
+    data_dir = str(sys.argv[1])  # '/home/ali/Dropbox/Courses/CS-433/road-segmentation/training_images'
+    label_dir = str(sys.argv[2])  # '/home/ali/Dropbox/Courses/CS-433/road-segmentation/training_groundtruth'
+    test_dir = str(sys.argv[3])  # '/home/ali/Dropbox/Courses/CS-433/road-segmentation/test_images'
+    path = str(sys.argv[4])  # '/home/ali/Dropbox/Courses/CS-433/road-segmentation/src'
+
     load_bow = True
     save_bow = False
     load_sift = True
     save_sift = False
-    load_model = True
-    save_model = False
+    load_model = False
+    save_model = True
     init = True
 
+    # Initialize the Tester class, which takes care of processing images, extracting SIFT features, constructing bag
+    # of words model, generating image crops from training images and annotating them as road/background/none, training
+    # linear classifier and predicting pixel labels on the test images using sliding window
     tester = Tester()
     tester.fit(data_dir, label_dir, load_bow=load_bow, save_bow=save_bow, load_sift=load_sift, save_sift=save_sift,
                load_model=load_model, save_model=save_model, path=path, init=init)
 
+    # store predictions in dictionary indexed by test file names
     predictions = {}
     image_files = [f for f in listdir(test_dir) if isfile(join(test_dir, f))]
     test_count = len(image_files)
     file = os.path.join(path, "prediction_grids.pkl")
     for i, f in enumerate(image_files):
         print('Transforming test image({}) {}/{}'.format(f, i + 1, test_count))
+        # threshold uint8 test images into {0,1}
         tic = time.time()
         I = cv2.imread(join(test_dir, image_files[i]), 0)
-        I[I < 128] = np.uint8(0)
-        I[I >= 128] = np.uint8(1)
         predictions[f] = tester.extract_transform(I)
         print('Transforming test image {}/{} done in {}'.format(i + 1, test_count, time.time() - tic))
 

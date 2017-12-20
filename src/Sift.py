@@ -2,7 +2,7 @@ import sys
 
 sys.path.append('/home/epfl/ftp/insta-network/src')
 
-import cv2, os
+import cv2, os, time
 import numpy as np
 import matplotlib.pyplot as plt
 from os import listdir
@@ -17,12 +17,12 @@ class DenseSift(object):
     collectively
     """
     PATCH_SIZE = 16
-    STEP_SIZE = 8
+    STEP_SIZE = 2
 
     def __init__(self, data=None, label=None, patch_size=PATCH_SIZE, step_size=STEP_SIZE, init=False):
         """Constructor for the DenseSift class. All the instance variables are initialized empty"""
-        self.corpus = {}
-        self.groundtruth = {}
+        self.corpus = {} # test images stored in a dictionary indexed by file names
+        self.groundtruth = {} # groundtruth training images (0-1 uint8 ndarray) in a dictionary indexed by file name
         self.SIFT_points = {}
         self.patch_size = patch_size
         self.step_size = step_size
@@ -71,6 +71,7 @@ class DenseSift(object):
         i = 1
         sift = cv2.xfeatures2d.SIFT_create()  # create a SIFT descriptor instance
         for key, img in self.corpus.items():
+            tic = time.time()
             # reflect image borders so that we can extract features at the border pixels.
             I = cv2.copyMakeBorder(img, np.int(patch_size/2), np.int(patch_size/2), np.int(patch_size/2), np.int(patch_size/2),
                                    cv2.BORDER_REFLECT_101)
@@ -92,7 +93,7 @@ class DenseSift(object):
             keypoints_, descriptors = sift.compute(I, keypoints)
             keypoints_ = [(kp.pt[0] - np.int(patch_size/2), kp.pt[1] - np.int(patch_size/2)) for kp in keypoints_]
             self.SIFT_points[key] = (keypoints_, descriptors)
-            print('image {} sift descriptors done'.format(i))
+            print('image {} sift descriptors done in {}'.format(i, time.time() - tic))
             i = i+1
 
     def save(self, path='/home/ali/Dropbox/Courses/CS-433/road-segmentation/src'):

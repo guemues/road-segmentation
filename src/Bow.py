@@ -15,7 +15,7 @@ class Bow():
     - Histogram is normalized into the 'transformed feature vector' of the given patch/image
     """
 
-    def __init__(self, num_centers=500, norm="l1", subsample=1, dim=128):
+    def __init__(self, num_centers=500, norm="l1", subsample=0.2, dim=128):
         """parameter are initialized to default values
         """
         self.num_centers = num_centers
@@ -34,13 +34,13 @@ class Bow():
         if self.subsample != 1:
             self.subsampled_indices = np.random.permutation(np.arange(0, self.features.shape[0]))[
                                       :int(self.features.shape[0] * self.subsample)]
-            self.subsampled_features = self.features[self.subsampled_features, :]
+            self.subsampled_features = self.features[self.subsampled_indices, :]
         else:
             self.subsampled_features = self.features
         self.centers = np.empty((self.num_centers, self.features.shape[1]))
         assert (self.subsampled_features.shape[0] > self.num_centers)
 
-        self.kmeans = KMeans(n_clusters=self.num_centers, verbose=1).fit(self.subsampled_features)
+        self.kmeans = KMeans(n_clusters=self.num_centers, n_init=10, max_iter=200, verbose=1).fit(self.subsampled_features)
         # self.nn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(self.centers)
 
         self.dim = self.kmeans.cluster_centers_.shape[1]

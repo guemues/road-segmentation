@@ -34,13 +34,13 @@ class Trainer(object):
         """
         self.bow_model = Bow()
         self.sift_model = DenseSift()
-        self.training_patch_road = np.array([])
-        self.training_patch_background = np.array([])
+        self.training_patch_road = np.array([]) # training matrix for road (n-by-128)
+        self.training_patch_background = np.array([]) # training data matrix for background (m-by-128)
         self.training_set_road = np.array([])
         self.training_set_background = np.array([])
         self.svm_model = SVC(class_weight='balanced', probability=True, verbose=1)
-        # self.log_reg_model = LogisticRegression(class_weight="balanced", verbose=1)
-        self.log_reg_model = LogisticRegressionCV(Cs=50, class_weight="balanced", tol=1e-8, max_iter=1000, verbose=1)
+        self.log_reg_model = LogisticRegression(class_weight="balanced", tol=1e-20, max_iter=1000, verbose=1)
+        # self.log_reg_model = LogisticRegressionCV(Cs=50, class_weight="balanced", tol=1e-8, max_iter=1000, verbose=1)
 
     def fit_sift(self, data_dir=None, label_dir=None, load=False, save=False, path='/', init=False):
         """SIFT model is constructed with training data and respective groundtruth images
@@ -130,9 +130,9 @@ class Trainer(object):
 
 
                 sift_step_size = 8
-                descriptor_map = np.zeros(shape=(int(image.shape[1]/sift_step_size)+1, int(image.shape[0]/sift_step_size)+1, 128))
+                descriptor_map = np.zeros(shape=(int(image.shape[0]/sift_step_size)+1, int(image.shape[1]/sift_step_size)+1, 128))
                 true_map = np.zeros(
-                    shape=(int(image.shape[1] / sift_step_size), int(image.shape[0] / sift_step_size)), dtype=np.bool)
+                    shape=(int(image.shape[0] / sift_step_size), int(image.shape[1] / sift_step_size)), dtype=np.bool)
                 for k, d in zip(keypoints, descriptors):
                     x, y = int(k[0]/sift_step_size), int(k[1]/sift_step_size)
                     descriptor_map[y,x,:] = d
@@ -244,12 +244,26 @@ class Trainer(object):
         self.log_reg_model.fit(X, y)
 
     def save(self, path, data_generation_mode='patch'):
-        file = os.path.join(path, "logreg_data_mode_{}.pkl".format(data_generation_mode))
+        file = os.path.join(path, "logreg_data_mode_{}_24_6.pkl".format(data_generation_mode))
         joblib.dump((self.log_reg_model, self.training_patch_road, self.training_patch_background), file)
 
     def load(self, path, data_generation_mode='patch'):
-        file = os.path.join(path, "logreg_data_mode_{}.pkl".format(data_generation_mode))
+        file = os.path.join(path, "logreg_data_mode_{}_24_6.pkl".format(data_generation_mode))
         (self.log_reg_model, self.training_patch_road, self.training_patch_background) = joblib.load(file)
+
+    def save_data(self, path, data_generation_mode='patch'):
+        file = os.path.join(path, 'training_data_mode_{}_24_6.pkl'.format(data_generation_mode))
+        if data_generation_mode == 'patch':
+            joblib.dump((self.training_patch_road, self.training_patch_background), file)
+        else:
+            joblib.dump((self.training_set_road, self.training_set_background), file)
+
+    def load_data(self, path, data_generation_mode='patch'):
+        file = os.path.join(path, 'training_data_mode_{}_24_6.pkl'.format(data_generation_mode))
+        if data_generation_mode == 'patch':
+            (self.training_patch_road, self.training_patch_background) = joblib.load(file)
+        else:
+            (self.training_set_road, self.training_set_background) = joblib.load(file)
 
 
     def fit_logistic_regresion(self, data_generation_mode='image'):
