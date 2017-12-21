@@ -4,8 +4,9 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 from sklearn.svm import LinearSVC, SVC
 from sklearn.linear_model import LogisticRegression
+from sklearn.externals import joblib
 
-import cv2, os
+import cv2, os, random
 import sys, time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,10 +26,10 @@ class Tester(object):
     MODEL_INIT = ['initialize', 'none'] # tells wether to initialize the SIFT and BOW models or not
     DATA_GENERATION_MODE = ['patch', 'image'] # defines the way training data is generated from training images
     PREDICTION_MODE = ['sliding_window', 'pixel_prediction'] # prediction strategy (More on report and comments)
-    WINDOW_SIZE = 12 # window size for generating training data in patch mode
-    PATCH_SIZE = 12 # patch size for generating training examples
-    CONFIDENCE = 8 # size of the confidence region in center of patches, required for patch mode training example generation
-    STEP_SIZE = 4 # step size of patch generation
+    WINDOW_SIZE = 24 # window size for generating training data in patch mode
+    PATCH_SIZE = 24 # patch size for generating training examples
+    CONFIDENCE = 6 # size of the confidence region in center of patches, required for patch mode training example generation
+    STEP_SIZE = 6 # step size of patch generation
     CLASSIFIER = ['SVM', 'Logistic_Regression'] # classifier type specification
 
     def __init__(self, test_dir=None, init=False):
@@ -51,7 +52,7 @@ class Tester(object):
 
     def fit(self, data_dir, label_dir, initialize_model=False, data_generation_mode='patch',
                          prediction_mode='sliding_window', classifier='Logistic_Regression', load_bow=False, save_bow=True,
-                        load_sift=False, save_sift=True, load_model=True, save_model=False, path='/', init=False):
+                        load_sift=False, save_sift=True, load_model=True, save_model=False, path='/', init=False, validation=True):
         """Prepares the environment for testing. Trains the SIFT and BOW models initially, with the images and groundtruth
         in the given directories. Training data is produces with respect to the choice of data generation mode. Finally,
         binary classifier is trained based on the data samples generated"""
@@ -82,6 +83,25 @@ class Tester(object):
         self.model.fit_sift(data_dir, label_dir, load=load_sift, save=save_sift, path=path, init=init)
         self.model.fit_bow(load=load_bow, save=save_bow, path=path)
 
+        # When validation is true it means that the algorithm is in validation mode: saves some of the training data for validation
+        # The validation data is reachable through a file saved into the same directory that runs the code.
+        if validation:
+
+            # get random subset of training images
+            image_keys = self.model.sift_model.get_corpus().keys()
+            validation_images = random.sample(image_keys, int(len(image_keys)/10))
+            validation_data = {}
+
+            # for each image in validation set, remove it before training and save relevant data/variables to a file.
+            for key in validation_images:
+                tuple = []
+                tuple.append(self.model.sift_model.corpus.pop(key, None))
+                tuple.append(self.model.sift_model.groundtruth.pop(key, None))
+                tuple.append(self.model.sift_model.SIFT_points.pop(key, None))
+                validation_data[key] = tuple
+
+        joblib.dump(validation_data, 'validation_data.pkl')
+
         '''If load_model is false, we go over all the training images, and generate histogram features of patches which
         are generated with a sliding window. Later, these features are formed into training data matrices, and we keep
         training data matrix for road and background examples under separate variables'''
@@ -93,7 +113,6 @@ class Tester(object):
             else:
                 self.model.generate_patch_training_set(self.WINDOW_SIZE, self.CONFIDENCE, self.CONFIDENCE)
 
-        if not load_model:
             self.model.save_data(path, data_generation_mode=self.data_generation_mode)
 
 
@@ -166,20 +185,29 @@ class Tester(object):
         # the SIFT descriptors extracted from the test image. Predict the label of the patch and compute the probability
         # of belonging to that label. For each pixel, assign the maximum of current probability and previous maximum
         # Refer to the report for more details on the method
-        sift_step_size = 2  # DenseSift.STEP_SIZE
+        sift_step_size = DenseSift.STEP_SIZE
+
+        # Here we represent SIFT descriptors of an image as a 3D structure where the third dimension is descriptors themselves
+        # Using this slicing approach, we save quite a bit of time. Instead of going through a list of descriptors, we
+        # take a slice of the 3D structure and process descriptors at once
         descriptor_map = np.zeros(
             shape=(int(size[1] / sift_step_size) + 1, int(size[0] / sift_step_size) + 1, 128))
+
         true_map = np.zeros(
             shape=(int(size[1] / sift_step_size), int(size[0] / sift_step_size)), dtype=np.bool)
+
+        # populate the 3D structure with descriptors
         for k, d in zip(keypoints, descriptors):
             x, y = int(k[1] / sift_step_size), int(k[0] / sift_step_size)
             descriptor_map[y, x, :] = d
             true_map[y, x] = True
 
+        # predict the confidence of observing a patch from a road
         prediction_grid = np.zeros(size)
         for x in range(0, size[1] - self.WINDOW_SIZE, 2):
             for y in range(0, size[0] - self.WINDOW_SIZE, 2):
 
+                # get the descriptors in the current patch and reshape them into matrix.
                 # tic = time.time()
                 x_ = x / sift_step_size
                 y_ = y / sift_step_size

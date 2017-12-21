@@ -71,3 +71,4 @@ def check_patch_confidence(truth, corner, window_size, confidence):
 def is_within_real_image(keypoint, image_size, reflection):
     return (keypoint[0] >= reflection) & (keypoint[1] >= reflection) & \
            (keypoint[0] < image_size[1] + reflection) & (keypoint[1] < image_size[0] + reflection)
+

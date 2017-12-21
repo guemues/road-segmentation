@@ -238,5 +238,5 @@ def main():
 
 
 if __name__ == '__main__':
-    prediction_main()
-    # main()
+    # prediction_main()
+    main()
