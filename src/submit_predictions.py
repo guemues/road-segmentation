@@ -122,7 +122,8 @@ def confidence_to_submission_image(path_predictions, path_groundtruth, path_test
     print('Average Mean F-Scores for various thresholds:\n{}'.format(average_fscore_thresholds))
     print('\nBest Threshold {} ==> {}\n'.format(best_threshold, average_fscore_thresholds[best_threshold_idx]))
 
-    best_threshold = 160
+    # best_threshold = 160
+    # best_threshold = 128
 
     # store the test confidence prediction image file names
     prediction_files = [f for f in listdir(path_test_predictions) if isfile(join(path_test_predictions, f))
@@ -135,15 +136,15 @@ def confidence_to_submission_image(path_predictions, path_groundtruth, path_test
         prediction = cv2.imread(join(path_predictions, f), 0)
         prediction_binary = threshold_image(prediction, best_threshold)
 
-        # apply closing then opening to connect nearby road segments and remove random road predictions that are just a
-        # few pixels and relatively separate from main segments of road (possible noisy predictions)
-        size = 5
-        kernel_closure = cv2.getStructuringElement(cv2.MORPH_RECT, (size+10, size+10))
-        kernel_opening_1 = cv2.getStructuringElement(cv2.MORPH_RECT, (size, size))
-        kernel_opening_2 = cv2.getStructuringElement(cv2.MORPH_RECT, (size+5, size+5))
-        # prediction_binary = cv2.morphologyEx(prediction_binary, cv2.MORPH_OPEN, kernel_opening_1)
-        prediction_binary = cv2.morphologyEx(prediction_binary, cv2.MORPH_CLOSE, kernel_closure)
-        prediction_binary = cv2.morphologyEx(prediction_binary, cv2.MORPH_OPEN, kernel_opening_2)
+        # # apply closing then opening to connect nearby road segments and remove random road predictions that are just a
+        # # few pixels and relatively separate from main segments of road (possible noisy predictions)
+        # size = 10
+        # kernel_closure = cv2.getStructuringElement(cv2.MORPH_RECT, (size+10, size+10))
+        # kernel_opening_1 = cv2.getStructuringElement(cv2.MORPH_RECT, (size-5, size-5))
+        # kernel_opening_2 = cv2.getStructuringElement(cv2.MORPH_RECT, (size+2, size+2))
+        # # prediction_binary = cv2.morphologyEx(prediction_binary, cv2.MORPH_OPEN, kernel_opening_1)
+        # prediction_binary = cv2.morphologyEx(prediction_binary, cv2.MORPH_CLOSE, kernel_closure)
+        # prediction_binary = cv2.morphologyEx(prediction_binary, cv2.MORPH_OPEN, kernel_opening_2)
 
         # write the binary image into file for submission
         cv2.imwrite(join(path_save, original_file), prediction_binary)
