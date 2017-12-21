@@ -1,21 +1,28 @@
 from __future__ import print_function, division
-
-import os
-
 import numpy as np
-from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
+import os
+from PIL import Image, ImageFile
+import copy
+from io import StringIO
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+# Ignore warnings
+import warnings
+
+warnings.filterwarnings("ignore")
 
 
-class RoadSegmentDataset(Dataset):
+class RoadSegmentDatasetMultiScale(Dataset):
     """
     Class used by pytorch DataLoader.
-    When asked object[idx], returns a crop of the image with the binary label.
+    When asked object[idx], returns a crop of the image with multiple scales with the binary label.
     Also returns to image index and the crop locations.
     """
-    def __init__(self, path, target_path, window_size, step_size, confidence_window):
-        self.window_size = window_size
+
+    def __init__(self, path, target_path, window_size_list, step_size, confidence_window):
+        self.window_size_list = window_size_list
         self.step_size = step_size
         self.path = path
         # name of the loaded images
@@ -37,7 +44,7 @@ class RoadSegmentDataset(Dataset):
         self.confidence_window = confidence_window
         # list of preprocessing operations applied to each crop
         self.transform = transforms.Compose([transforms.Scale((224, 224)),
-                                             transforms.RandomHorizontalFlip(),
+                                             # transforms.RandomHorizontalFlip(),
                                              transforms.ToTensor(),
                                              transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                   std=[0.229, 0.224, 0.225])
@@ -70,23 +77,24 @@ class RoadSegmentDataset(Dataset):
             crop_y_loc = int(crop_y_idx * self.step_size)
 
             # do the cropping with the previously computed image index and crop locations
-            crop_image = self.images_list[image_idx].crop((
-                int(crop_x_loc - self.window_size / 2), int(crop_y_loc - self.window_size / 2),
-                int(crop_x_loc + self.window_size / 2), int(crop_y_loc + self.window_size / 2)))
-
-            # do the preprocessing defined in the constructor
-            crop_image = self.transform(crop_image)
+            crop_image_list = []
+            for window_size in self.window_size_list:
+                crop_image = self.images_list[image_idx].crop((
+                    int(crop_x_loc - window_size / 2), int(crop_y_loc - window_size / 2),
+                    int(crop_x_loc + window_size / 2), int(crop_y_loc + window_size / 2)))
+                # do the preprocessing defined in the constructor
+                crop_image = self.transform(crop_image)
+                crop_image_list.append(crop_image)
 
             # if this is not a test image, calculated whether this is a road instance
             if self.have_labels:
-                # make the center cropping with much smaller confidence window
                 target_image_crop = self.target_images_list[image_idx].crop(
                     (int(crop_x_loc - self.confidence_window / 2),
                      int(crop_y_loc - self.confidence_window / 2),
                      int(crop_x_loc + self.confidence_window / 2),
                      int(crop_y_loc + self.confidence_window / 2)))
 
-                # count the number of positive pixels in the center crop to determine whether this is a road instance
+                # count the number of positive pixels in the center crop to determine whether this is a road instance                sum = 0
                 sum = 0
                 for i in range(target_image_crop.width):
                     for j in range(target_image_crop.height):
@@ -96,10 +104,11 @@ class RoadSegmentDataset(Dataset):
             else:
                 road = False
 
-            return crop_image, road, image_idx, crop_x_loc, crop_y_loc
+            return crop_image_list[0], crop_image_list[1], crop_image_list[2], road, image_idx, crop_x_loc, crop_y_loc
         except BaseException as e:
             # print(e)
-            return self[np.random.randint(0, int(self.__len__() * 0.8))]
+            return self[np.random.randint(0, int(
+                self.__len__() * 0.8))]  # return a random item back (hopefully) without an exception
 
 
 if __name__ == "__main__":
@@ -108,17 +117,32 @@ if __name__ == "__main__":
     step_size = 5
     confidence_window = 5
 
-    dataset = RoadSegmentDataset(os.path.join(data_dir, "val"),
-                                 os.path.join(data_dir, "val" + "_label"), window_size, step_size, confidence_window)
+    dataset = RoadSegmentDatasetMultiScale(os.path.join(data_dir, "val"),
+                                           os.path.join(data_dir, "val" + "_label"), [32, 64, 128], step_size,
+                                           confidence_window)
+    import torch
+
+    dataloaders = {x: torch.utils.data.DataLoader(dataset, batch_size=10,
+                                                  shuffle=True, num_workers=1)
+                   for x in ['test', 'val', 'train']}
 
     idx = 0
     while True:
         idx = idx + 1
-        crop_image, road, image_idx, crop_x_loc, crop_y_loc = dataset[idx]
+        crop_image_list, road, image_idx, crop_x_loc, crop_y_loc = dataset[idx]
         print(road)
-        image = crop_image.numpy().transpose((1, 2, 0)) * [0.25, 0.25, 0.25] + [0.5, 0.5, 0.5]
+        image = crop_image_list[0].numpy().transpose((1, 2, 0)) * [0.25, 0.25, 0.25] + [0.5, 0.5, 0.5]
+        image1 = crop_image_list[1].numpy().transpose((1, 2, 0)) * [0.25, 0.25, 0.25] + [0.5, 0.5, 0.5]
+        image2 = crop_image_list[2].numpy().transpose((1, 2, 0)) * [0.25, 0.25, 0.25] + [0.5, 0.5, 0.5]
+        image = np.clip(image, 0, 1)
+        image1 = np.clip(image1, 0, 1)
+        image2 = np.clip(image2, 0, 1)
         import matplotlib.pyplot as plt
 
         plt.imshow(image)
+        plt.figure()
+        plt.imshow(image1)
+        plt.figure()
+        plt.imshow(image2)
         plt.title(str(road))
         plt.show()
