@@ -17,6 +17,8 @@ from sklearn.metrics import confusion_matrix as cfmat
 from sklearn.metrics import f1_score
 from torch.autograd import Variable
 from torch.optim import lr_scheduler
+from networks import resnet_multi_scale
+from RoadSegmentDatasetMultiScale import RoadSegmentDatasetMultiScale
 
 from RoadSegmentDataset import RoadSegmentDataset
 
@@ -28,7 +30,6 @@ def softmax(x):
 
 def train_model(model, criterion, optimizer, scheduler, image_names_list, num_epochs=25, model_name=None):
     since = time.time()
-
     # allocate storage for images
     train_predictions = np.zeros((len(image_names_list["train"]), 400, 400), dtype=np.float32)
     val_predictions = np.zeros((len(image_names_list["val"]), 400, 400), dtype=np.float32)
@@ -58,11 +59,11 @@ def train_model(model, criterion, optimizer, scheduler, image_names_list, num_ep
             iter = 0
             for data in dataloaders[phase]:
                 # get the inputs
-                inputs, labels, image_idx, crop_x_loc_list, crop_y_loc_list = data
+                inputs, inputs1, inputs2, labels, image_idx, crop_x_loc_list, crop_y_loc_list = data
                 iter = iter + 1
 
                 # manual early stopping
-                if iter > 2500 and phase == "train":
+                if False and iter > 2500 and phase == "train":
                     break
 
                 # early saving of test images to understand the progress
@@ -76,15 +77,17 @@ def train_model(model, criterion, optimizer, scheduler, image_names_list, num_ep
                 # wrap them in Variable
                 if use_gpu:
                     inputs = Variable(inputs.cuda())
+                    inputs1 = Variable(inputs1.cuda())
+                    inputs2 = Variable(inputs2.cuda())
                     labels = Variable(labels.cuda())
                 else:
-                    inputs, labels = Variable(inputs), Variable(labels)
+                    inputs, inputs1, inputs2, labels = Variable(inputs), Variable(inputs1), Variable(inputs2), Variable(labels)
 
-                # zero the parameter gradients
+                # zero thppe parameter gradients
                 optimizer.zero_grad()
 
                 # forward
-                outputs = model(inputs)
+                outputs = model((inputs, inputs1, inputs2))
                 # the size of the window we assign for each predict
                 pred_step_size = 5 + 1
                 max_len = 400 if phase == "train" or phase == "val" else 608
@@ -198,17 +201,17 @@ if __name__ == "__main__":
     use_gpu = torch.cuda.is_available()
 
     # initiliaze the hyperparameters
-    window_size = 60
+    window_size = [32, 64, 128]
     step_size = 5
     confidence_window = 5
-    batch_size = 128 if use_gpu else 16
+    batch_size = 96 if use_gpu else 16
 
+    # initiliaze the dataset
     data_dir = './'
-    image_datasets = {x: RoadSegmentDataset(os.path.join(data_dir, x),
-                                            os.path.join(data_dir, x + "_label"), window_size, step_size,
-                                            confidence_window)
+    image_datasets = {x: RoadSegmentDatasetMultiScale(os.path.join(data_dir, x),
+                                                      os.path.join(data_dir, x + "_label"), window_size, step_size,
+                                                      confidence_window)
                       for x in ['train', 'val', "test"]}
-
     image_names_list = {x: image_datasets[x].image_names_list
                         for x in ['train', 'val', "test"]}
 
@@ -217,7 +220,9 @@ if __name__ == "__main__":
                    for x in ['test', 'val', 'train']}
     dataset_sizes = {x: len(image_datasets[x]) for x in ['test', 'val', "train"]}
 
-    model_conv = torchvision.models.resnet18(pretrained=True)
+
+    # initiliaze the model
+    model_conv = resnet_multi_scale(torchvision.models.resnet18(pretrained=True), require_grad=True)
 
     # UNCOMMENT THIS TO ADD ONE MORE FC LAYER
     # model_conv = resnet_and_fc(model_conv)
@@ -230,9 +235,6 @@ if __name__ == "__main__":
     #    param.requires_grad = False
 
     # changing the last layer to make binary classification
-    num_ftrs = model_conv.fc.in_features
-    model_conv.fc = nn.Linear(num_ftrs, 2)
-
     print(model_conv)
     if use_gpu:
         model_conv = model_conv.cuda()
@@ -243,13 +245,13 @@ if __name__ == "__main__":
     else:
         criterion = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1.0, 2.0], dtype=np.float32)))
 
-    # preapre the learning rate. Use smaller learning rate for already trained layers and larger for the last fully
+    # prepare the learning rate for each layer. Use smaller learning rate for already trained layers and larger for the last fully
     #     connected layer
     lr = 0.0001
     params = []
     for name, value in model_conv.named_parameters():
         if 'bias' in name:
-            if 'fc' in name:
+            if 'fc' in name or "last_layer" in name:
                 params += [{'params': value, 'lr': 20 * lr, 'weight_decay': 0}]
             else:
                 params += [{'params': value, 'lr': 20 * lr, 'weight_decay': 0}]
@@ -265,9 +267,8 @@ if __name__ == "__main__":
     # Decay LR by a factor of 0.1 every 7 epochs
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_conv, step_size=7, gamma=0.1)
 
-    model_name = "full_larger_epoch"
+    model_name = "full_larger_epoch_multiscale"
     print(model_name)
-
     # start the training
     model_conv = train_model(model_conv, criterion, optimizer_conv,
                              exp_lr_scheduler, image_names_list, num_epochs=25, model_name=model_name)
