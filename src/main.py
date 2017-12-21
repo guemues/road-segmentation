@@ -19,16 +19,28 @@ from Tester import *
 from sklearn.externals import joblib
 from sklearn.model_selection import cross_val_score
 
+'''This file is the ultimate train/test script for SIFT-BOW-LOGISTIC model. For model training part it does the following:
+- reads the images,
+- generates SIFT features,
+- trains bag of words model,
+- generates training image patches by producing respective normalized cluster centroid histogram based on features in the patch,
+- trains a logistic regression model
+
+For model testing, it does the following:
+- extracts SIFT features from test images
+- for each patch (via a sliding window), create normalized cluster centroid histogram feature vector
+- using the prediction confidence per patch, generate a grid of confidence values as output'''
+
 def main():
 
     if len(sys.argv) != 5:
-        print('Please enter directories for training images, groundtruth images, test images and path to saving models in given order')
+        print('Please enter directories for training images, groundtruth images, test images and path to saving models')
         return
 
-    data_dir = str(sys.argv[1])  # '/home/ali/Dropbox/Courses/CS-433/road-segmentation/training_images'
-    label_dir = str(sys.argv[2])  # '/home/ali/Dropbox/Courses/CS-433/road-segmentation/training_groundtruth'
-    test_dir = str(sys.argv[3])  # '/home/ali/Dropbox/Courses/CS-433/road-segmentation/test_images'
-    path = str(sys.argv[4])  # '/home/ali/Dropbox/Courses/CS-433/road-segmentation/src'
+    data_dir = str(sys.argv[1])
+    label_dir = str(sys.argv[2])
+    test_dir = str(sys.argv[3])
+    path = str(sys.argv[4])
 
     load_bow = True
     save_bow = False

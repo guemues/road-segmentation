@@ -3,6 +3,7 @@
 import os
 import numpy as np
 import matplotlib.image as mpimg
+import cv2
 import re
 
 foreground_threshold = 0.25 # percentage of pixels > 1 required to assign a foreground label to a patch
@@ -19,7 +20,8 @@ def patch_to_label(patch):
 def mask_to_submission_strings(image_filename):
     """Reads a single image and outputs the strings that should go into the submission file"""
     img_number = int(re.search(r"\d+", image_filename).group(0))
-    im = mpimg.imread(image_filename)
+    # im = mpimg.imread(image_filename)
+    im = cv2.imread(image_filename, 0)
     patch_size = 16
     for j in range(0, im.shape[1], patch_size):
         for i in range(0, im.shape[0], patch_size):
@@ -32,7 +34,8 @@ def masks_to_submission(submission_filename, *image_filenames):
     """Converts images into a submission file"""
     with open(submission_filename, 'w') as f:
         f.write('id,prediction\n')
-        for fn in image_filenames[0:]:
+        for i, fn in enumerate(image_filenames[0:]):
+            print('Image {} = {}'.format(i, fn))
             f.writelines('{}\n'.format(s) for s in mask_to_submission_strings(fn))
 
 
