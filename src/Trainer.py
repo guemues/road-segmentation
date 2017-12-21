@@ -129,7 +129,7 @@ class Trainer(object):
                 assert (window_size <= image.shape[0] and window_size <= image.shape[1])
 
 
-                sift_step_size = 8
+                sift_step_size = DenseSift.STEP_SIZE
                 descriptor_map = np.zeros(shape=(int(image.shape[0]/sift_step_size)+1, int(image.shape[1]/sift_step_size)+1, 128))
                 true_map = np.zeros(
                     shape=(int(image.shape[0] / sift_step_size), int(image.shape[1] / sift_step_size)), dtype=np.bool)
@@ -154,7 +154,9 @@ class Trainer(object):
                             # # convert from tuple to ndarray
                             # feature = np.concatenate(feature, axis=0)
 
-                            tic_ = time.time()
+                            # Slice the descriptors that lie in the current patch using the 3D structure that keeps desciptors
+                            # at their key points locations for speeding up implementation
+                            # tic_ = time.time()
                             x_ = x / sift_step_size
                             y_ = y / sift_step_size
                             min_x = max(0, int(x_))

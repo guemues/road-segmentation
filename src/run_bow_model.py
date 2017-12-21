@@ -3,6 +3,9 @@ from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 from sklearn.svm import LinearSVC, SVC
+from sklearn.metrics import f1_score
+from sklearn.externals import joblib
+from sklearn.model_selection import cross_val_score
 
 import cv2, os
 import sys, time
@@ -16,8 +19,7 @@ from Bow import *
 from Sift import *
 from Trainer import *
 from Tester import *
-from sklearn.externals import joblib
-from sklearn.model_selection import cross_val_score
+from submit_predictions import *
 
 '''This file is the ultimate train/test script for SIFT-BOW-LOGISTIC model. For model training part it does the following:
 - reads the images,
@@ -42,10 +44,10 @@ def main():
     test_dir = str(sys.argv[3])
     path = str(sys.argv[4])
 
-    load_bow = True
-    save_bow = False
-    load_sift = True
-    save_sift = False
+    load_bow = False
+    save_bow = True
+    load_sift = False
+    save_sift = True
     load_model = False
     save_model = True
     init = True
@@ -56,6 +58,10 @@ def main():
     tester = Tester()
     tester.fit(data_dir, label_dir, load_bow=load_bow, save_bow=save_bow, load_sift=load_sift, save_sift=save_sift,
                load_model=load_model, save_model=save_model, path=path, init=init)
+
+    # use validation data for threshold optimization and mean f score computation for the validation set.
+    validation_data = joblib.load('validation_data.pkl')
+
 
     # store predictions in dictionary indexed by test file names
     predictions = {}
