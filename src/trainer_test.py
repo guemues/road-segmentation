@@ -25,7 +25,7 @@ def main():
     trainer.fit_sift(data_dir, label_dir, init=True)
     trainer.fit_bow()
     trainer.generate_image_training_set()
-    trainer.fit_svm
+    trainer.fit
 
 if __name__ == "__main__":
     main()

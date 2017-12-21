@@ -25,9 +25,10 @@ class Tester(object):
     MODEL_INIT = ['initialize', 'none'] # tells wether to initialize the SIFT and BOW models or not
     DATA_GENERATION_MODE = ['patch', 'image'] # defines the way training data is generated from training images
     PREDICTION_MODE = ['sliding_window', 'pixel_prediction'] # prediction strategy (More on report and comments)
-    WINDOW_SIZE = 40 # window size for generating training data in patch mode
-    CONFIDENCE = 6 # size of the confidence region in center of patches, required for patch mode training example generation
-    STEP_SIZE = 6 # step size of patch generation
+    WINDOW_SIZE = 12 # window size for generating training data in patch mode
+    PATCH_SIZE = 12 # patch size for generating training examples
+    CONFIDENCE = 8 # size of the confidence region in center of patches, required for patch mode training example generation
+    STEP_SIZE = 4 # step size of patch generation
     CLASSIFIER = ['SVM', 'Logistic_Regression'] # classifier type specification
 
     def __init__(self, test_dir=None, init=False):
@@ -55,6 +56,8 @@ class Tester(object):
         in the given directories. Training data is produces with respect to the choice of data generation mode. Finally,
         binary classifier is trained based on the data samples generated"""
 
+        print('Data Generation: {}\nClassifier: {}\n'.format(data_generation_mode, classifier))
+
         assert (isinstance(initialize_model, bool))
 
         # set data generation mode
@@ -79,6 +82,10 @@ class Tester(object):
         self.model.fit_sift(data_dir, label_dir, load=load_sift, save=save_sift, path=path, init=init)
         self.model.fit_bow(load=load_bow, save=save_bow, path=path)
 
+        '''If load_model is false, we go over all the training images, and generate histogram features of patches which
+        are generated with a sliding window. Later, these features are formed into training data matrices, and we keep
+        training data matrix for road and background examples under separate variables'''
+
         # generate training data based on previously set data generation mode
         if not load_model:
             if self.data_generation_mode == 'image':
@@ -86,15 +93,23 @@ class Tester(object):
             else:
                 self.model.generate_patch_training_set(self.WINDOW_SIZE, self.CONFIDENCE, self.CONFIDENCE)
 
+        if not load_model:
+            self.model.save_data(path, data_generation_mode=self.data_generation_mode)
+
+
+        '''If load_model is True, we load a previously trained and saved model, together with training data matrices for
+        road and background data samples. '''
         # finally, train the binary classifier
         if self.classifier == 'Logistic_Regression':
             if load_model:
-                self.model.load(path)
+                self.model.load(path, self.data_generation_mode)
+                # self.model.log_reg_model = LogisticRegression(class_weight="balanced", tol=1e-20, max_iter=1000, verbose=1)
+                # self.model.fit(self.data_generation_mode)
             else:
                 self.model.fit(self.data_generation_mode)
 
             if save_model:
-                self.model.save(path)
+                self.model.save(path, self.data_generation_mode)
         elif self.classifier == 'SVM':
             return
 
@@ -124,7 +139,7 @@ class Tester(object):
                                np.int(patch_size / 2),
                                cv2.BORDER_REFLECT_101)
         keypoints = sift.detect(I, None)
-        keypoints = [kp for kp in keypoints if is_within_real_image(kp, img.shape, np.int(patch_size / 2))]
+        keypoints = [kp for kp in keypoints if is_within_real_image(kp.pt, img.shape, np.int(patch_size / 2))]
 
         # sample the keypoints in the test image
         # if dense option is True, sample dense overlapping SIFT ketpoints
@@ -151,7 +166,7 @@ class Tester(object):
         # the SIFT descriptors extracted from the test image. Predict the label of the patch and compute the probability
         # of belonging to that label. For each pixel, assign the maximum of current probability and previous maximum
         # Refer to the report for more details on the method
-        sift_step_size = 8
+        sift_step_size = 2  # DenseSift.STEP_SIZE
         descriptor_map = np.zeros(
             shape=(int(size[1] / sift_step_size) + 1, int(size[0] / sift_step_size) + 1, 128))
         true_map = np.zeros(
@@ -163,17 +178,9 @@ class Tester(object):
 
         prediction_grid = np.zeros(size)
         for x in range(0, size[1] - self.WINDOW_SIZE, 2):
-            # print('image column: {}'.format(x))
             for y in range(0, size[0] - self.WINDOW_SIZE, 2):
-                # feature = ()
-                # tic = time.time()
-                # for i, kp in enumerate(keypoints):
-                #     # compute the descriptors that fall into the patch
-                #     if is_within_window(kp, (x, y), self.WINDOW_SIZE):
-                #         feature = feature + (descriptors[i, :].reshape(1, -1),)
-                # print('Window ({},{}) features in {}'.format(x, y, time.time() - tic))
-            # feature = np.concatenate(feature, axis=0)
 
+                # tic = time.time()
                 x_ = x / sift_step_size
                 y_ = y / sift_step_size
                 min_x = max(0, int(x_))
@@ -182,7 +189,7 @@ class Tester(object):
                 max_y = min(descriptor_map.shape[0], int(y_ + self.WINDOW_SIZE / sift_step_size))
 
                 feature = descriptor_map[min_y:max_y, min_x:max_x, :].reshape((-1, 128))
-
+                # print('Time for slicing patch at ({},{}): {}'.format(x, y, time.time() - tic))
 
                 # compute feature vector out of descriptors and predict the label together with confidence score (probability)
                 image_features = self.model.bow_model.transform(feature)
@@ -197,7 +204,7 @@ class Tester(object):
     def extract_transform(self, I, dense=True, patch_size=4, step_size=2):
         """Given a test image, it predicts the labels of each pixel"""
 
-        keypoints, descriptors = self.extract(I, dense=True, patch_size=4, step_size=2)
+        keypoints, descriptors = self.extract(I, dense=dense, patch_size=patch_size, step_size=step_size)
         return self.transform(keypoints, descriptors, I.shape, 8)
 
 
